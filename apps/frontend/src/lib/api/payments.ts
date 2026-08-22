@@ -56,31 +56,28 @@ export async function createPayment(payload: CreatePaymentPayload): Promise<Paym
     idempotencyKey: payload.idempotencyKey ?? crypto.randomUUID(),
   };
 
-  try {
-    const response = await fetch(`${apiBaseUrl}/v1/payments`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        Accept: "application/json",
-        "x-api-key": merchantApiKey,
-      },
-      body: JSON.stringify(requestBody),
-      cache: "no-store",
-    });
+  const response = await fetch(`${apiBaseUrl}/v1/payments`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      Accept: "application/json",
+      "x-api-key": merchantApiKey,
+    },
+    body: JSON.stringify(requestBody),
+    cache: "no-store",
+  });
 
-    if (!response.ok) {
-      throw new Error(`Payment creation failed: ${response.status}`);
-    }
-
-    const data = (await response.json()) as PaymentResult;
-    return {
-      ...data,
-      description: payload.description,
-      paymentLink: data.paymentLink ?? `${window.location.origin}/pay/${data.transactionId}`,
-    };
-  } catch {
-    return buildFallbackPayment(payload);
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `Payment creation failed: ${response.status}`);
   }
+
+  const data = (await response.json()) as PaymentResult;
+  return {
+    ...data,
+    description: payload.description,
+    paymentLink: data.paymentLink ?? `${window.location.origin}/pay/${data.transactionId}`,
+  };
 }
 
 export async function simulatePaymentStatus(

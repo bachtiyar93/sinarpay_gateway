@@ -117,27 +117,14 @@ export class CallbacksService {
       this.bankSecret(),
     );
 
-    try {
-      const result = await this.handleBankNotification({
-        ...dto,
-        bankSignature,
-      });
+    const result = await this.handleBankNotification({
+      ...dto,
+      bankSignature,
+    });
 
-      return {
-        ...result,
-        status: normalizeTransactionStatus(result.status),
-      };
-    } catch (error) {
-      if (error instanceof NotFoundException) {
-        return {
-          success: true,
-          transactionId: dto.transactionId,
-          status: normalizeTransactionStatus(dto.status),
-          message: `Dev simulation accepted for unknown transaction ${dto.transactionId}. No database record was found, but the requested status was applied in simulation mode.`,
-        };
-      }
-
-      throw error;
-    }
+    return {
+      ...result,
+      status: normalizeTransactionStatus(result.status),
+    };
   }
 }

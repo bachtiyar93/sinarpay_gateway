@@ -9,6 +9,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { QrisSimulatorService } from './qris-simulator.service';
 import { IdempotencyService } from '../../common/services/idempotency.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
+import { SearchTransactionsDto } from './dto/search-transactions.dto';
 import { CreatePaymentResponse } from './dto/create-payment-response.interface';
 import {
   isValidTransition,
@@ -179,5 +180,56 @@ export class TransactionService {
     }
 
     return transaction;
+  }
+
+  async searchTransactions(merchantId: string, dto: SearchTransactionsDto) {
+    const page = dto.page ?? 1;
+    const limit = dto.limit ?? 10;
+    const skip = (page - 1) * limit;
+
+    // Build where clause
+    const where: any = {
+      merchantId,
+    };
+
+    // Filter by status if provided
+    if (dto.status && dto.status !== 'ALL') {
+      where.status = normalizeTransactionStatus(dto.status);
+    }
+
+    // Search by transaction ID
+    if (dto.search) {
+      where.id = { contains: dto.search, mode: 'insensitive' };
+    }
+
+    // Execute query with pagination
+    const [items, total] = await Promise.all([
+      this.prisma.transaction.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip,
+        select: {
+          id: true,
+          amount: true,
+          currency: true,
+          status: true,
+          createdAt: true,
+        },
+      }),
+      this.prisma.transaction.count({ where }),
+    ]);
+
+    return {
+      items: items.map((item) => ({
+        id: item.id,
+        amount: item.amount,
+        status: item.status,
+        date: item.createdAt.toISOString(),
+      })),
+      total,
+      page,
+      limit,
+    };
   }
 }

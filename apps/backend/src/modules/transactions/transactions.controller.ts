@@ -3,6 +3,7 @@ import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { TransactionService } from './transactions.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
+import { SearchTransactionsDto } from './dto/search-transactions.dto';
 import { CreatePaymentResponse } from './dto/create-payment-response.interface';
 import { ApiKeyGuard } from '../../common/guards/api-key.guard';
 import type { Request } from 'express';
@@ -45,5 +46,21 @@ export class TransactionController {
       throw new Error('Merchant ID not found in request');
     }
     return this.transactionService.createTransaction(merchantId, dto);
+  }
+
+  @Post('merchant/transactions/search')
+  @UseGuards(ApiKeyGuard)
+  @ApiOperation({ summary: 'Search merchant transactions' })
+  @ApiResponse({ status: 200, description: 'Transactions retrieved successfully' })
+  @ApiResponse({ status: 401, description: 'Invalid API key' })
+  async searchTransactions(
+    @Body() dto: SearchTransactionsDto,
+    @Req() req: MerchantRequest,
+  ) {
+    const merchantId = req.user?.merchantId;
+    if (!merchantId) {
+      throw new Error('Merchant ID not found in request');
+    }
+    return this.transactionService.searchTransactions(merchantId, dto);
   }
 }

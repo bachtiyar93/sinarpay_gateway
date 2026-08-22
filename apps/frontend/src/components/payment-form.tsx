@@ -1,6 +1,7 @@
 "use client";
 
 import { useForm } from "react-hook-form";
+import { useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { createPayment } from "@/lib/api/payments";
 import { usePaymentGeneratorStore } from "@/stores/payment-generator.store";
@@ -15,6 +16,7 @@ type PaymentFormValues = z.infer<typeof paymentSchema>;
 
 export function PaymentForm() {
   const { amount, description, currency, isSubmitting, setDraft, setResult, setSubmitting } = usePaymentGeneratorStore();
+  const queryClient = useQueryClient();
   const form = useForm<PaymentFormValues>({
     defaultValues: {
       amount: Number(amount) || 0,
@@ -47,19 +49,16 @@ export function PaymentForm() {
         description: sanitizedValues.description || undefined,
       });
       setResult(result);
+      
+      // Invalidate transactions cache to refresh data
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      
       form.reset({ amount: 0, description: "", currency: sanitizedValues.currency });
       setDraft({ amount: "", description: "", currency: sanitizedValues.currency });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to create payment.";
-      setResult({
-        transactionId: "ERROR",
-        qrisString: message,
-        amount: sanitizedValues.amount,
-        currency: sanitizedValues.currency,
-        status: "ERROR",
-        expiresAt: new Date().toISOString(),
-        description: sanitizedValues.description || undefined,
-      });
+      form.setError("amount", { type: "manual", message: `Payment creation failed: ${message}` });
+      setResult(null);
     } finally {
       setSubmitting(false);
     }

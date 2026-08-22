@@ -14,8 +14,9 @@ export function useTransactions() {
         page,
         limit,
       }),
-    staleTime: 60 * 1000,
-    refetchOnWindowFocus: false,
+    staleTime: 10 * 1000, // 10 seconds
+    refetchInterval: 15 * 1000, // Auto-refresh every 15 seconds
+    refetchOnWindowFocus: true, // Refresh when tab becomes active
   });
 }
 
