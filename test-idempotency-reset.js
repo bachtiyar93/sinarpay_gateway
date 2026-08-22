@@ -9,7 +9,7 @@
  * 4. Should create NEW transaction (different from payment 1)
  * 
  * Before fix: Payment 2 would use same key as Payment 1 → Error
- * After fix: Payment 2 gets new key → Creates new transaction ✅
+ * After fix: Payment 2 gets new key → Creates new transaction
  */
 
 const baseUrl = process.env.BACKEND_URL || 'http://localhost:3000';
