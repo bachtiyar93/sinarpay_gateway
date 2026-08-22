@@ -19,5 +19,5 @@ export const validationSchema = Joi.object({
     .description('32-byte hex string (64 characters)'),
   BANK_CALLBACK_SECRET: Joi.string().required(),
   WEBHOOK_MAX_RETRIES: Joi.number().default(5),
-  FRONTEND_URL: Joi.string().uri().default('http://localhost:3000'),
+  FRONTEND_URL: Joi.string().uri().default('http://localhost:3001'),
 });

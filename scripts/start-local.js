@@ -59,11 +59,11 @@ function ensureEnvFiles() {
 function clearPortIfInUse(port) {
   try {
     if (process.platform === 'win32') {
-      const output = execSync(
+      execSync(
         `powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort ${port} -ErrorAction SilentlyContinue | ForEach-Object { $_.OwningProcess } | Sort-Object -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }"`,
         { stdio: 'ignore' },
       );
-      return output;
+      return;
     }
 
     try {
@@ -74,6 +74,41 @@ function clearPortIfInUse(port) {
     }
   } catch {
     // ignore stale-process cleanup when the port is free or tooling is unavailable
+  }
+}
+
+function clearProjectNodeProcesses() {
+  try {
+    if (process.platform === 'win32') {
+      execSync(
+        `powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.Name -match 'node(.exe)?' } | Where-Object { $_.CommandLine -match 'sinarpay|next|nest|concurrently' } | Select-Object -ExpandProperty ProcessId | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }"`,
+        { stdio: 'ignore' },
+      );
+    } else {
+      execSync("ps -eo pid,cmd --no-headers | grep -E 'sinarpay|next|nest|concurrently' | awk '{print $1}' | xargs -r kill -9", { stdio: 'ignore' });
+    }
+  } catch {
+    // ignore stale process cleanup failures
+  }
+}
+
+function clearPrismaClientLocks() {
+  clearProjectNodeProcesses();
+
+  const prismaClientDir = path.join(repoRoot, 'apps', 'backend', 'node_modules', '.prisma');
+  const frontendBuildDir = path.join(repoRoot, 'apps', 'frontend', '.next');
+
+  try {
+    if (fs.existsSync(prismaClientDir)) {
+      fs.rmSync(prismaClientDir, { recursive: true, force: true });
+      log('Cleared stale Prisma client cache to avoid EPERM lock errors.', '\x1b[33m');
+    }
+
+    if (fs.existsSync(frontendBuildDir)) {
+      fs.rmSync(frontendBuildDir, { recursive: true, force: true });
+    }
+  } catch {
+    // ignore cleanup failures; the next step will retry and surface a clearer error if the issue remains
   }
 }
 
@@ -160,11 +195,12 @@ async function ensureDockerServices() {
   await waitForHealthy();
 
   log('[5/5] Preparing database schema and seeding admin user...');
+  clearPrismaClientLocks();
   await runCommand('npm', ['run', 'db:prepare'], { cwd: repoRoot });
 }
 
 async function startApp() {
-  log('[START] Membersihkan port yang masih dipakai oleh proses lama...');
+  log('[START] Membersihkan port stale sebelum boot...');
   clearPortIfInUse(3000);
   clearPortIfInUse(3001);
 
