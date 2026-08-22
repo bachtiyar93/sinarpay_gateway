@@ -5,6 +5,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../../database/prisma.service';
 import { QrisSimulatorService } from './qris-simulator.service';
 import { IdempotencyService } from '../../common/services/idempotency.service';
@@ -219,6 +220,231 @@ export class TransactionService {
     );
 
     return this.getTransactionDetail(transactionId, merchantId);
+  }
+
+  async getMerchantProfile(merchantId: string) {
+    const merchant = await this.prisma.merchant.findUnique({
+      where: { id: merchantId },
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        createdAt: true,
+        balance: true,
+      },
+    });
+
+    if (!merchant) {
+      throw new NotFoundException('Merchant not found');
+    }
+
+    return {
+      id: merchant.id,
+      name: merchant.name,
+      email: null,
+      status: merchant.status,
+      createdAt: merchant.createdAt.toISOString(),
+      balance: merchant.balance.toNumber(),
+    };
+  }
+
+  async getMerchantApiKeys(merchantId: string) {
+    const merchant = await this.prisma.merchant.findUnique({
+      where: { id: merchantId },
+      select: {
+        id: true,
+        apiKeyHash: true,
+        createdAt: true,
+      },
+    });
+
+    if (!merchant) {
+      throw new NotFoundException('Merchant not found');
+    }
+
+    return [
+      {
+        id: merchant.id,
+        key: merchant.apiKeyHash,
+        createdAt: merchant.createdAt.toISOString(),
+        lastUsedAt: null,
+      },
+    ];
+  }
+
+  async regenerateMerchantApiKey(merchantId: string, keyId: string) {
+    if (merchantId !== keyId) {
+      throw new NotFoundException('API key not found');
+    }
+
+    const newApiKey = `merchant-${randomUUID().replace(/-/g, '')}`;
+    const merchant = await this.prisma.merchant.update({
+      where: { id: merchantId },
+      data: { apiKeyHash: newApiKey },
+      select: {
+        id: true,
+        apiKeyHash: true,
+        createdAt: true,
+      },
+    });
+
+    return {
+      id: merchant.id,
+      key: merchant.apiKeyHash,
+      createdAt: merchant.createdAt.toISOString(),
+      lastUsedAt: null,
+    };
+  }
+
+  async getMerchantAnalytics(merchantId: string) {
+    await this.expirePendingTransactions();
+
+    const [merchant, totalTransactions, successfulTransactions, successfulSum] =
+      await Promise.all([
+        this.prisma.merchant.findUnique({
+          where: { id: merchantId },
+          select: { balance: true },
+        }),
+        this.prisma.transaction.count({
+          where: { merchantId },
+        }),
+        this.prisma.transaction.count({
+          where: { merchantId, status: 'SUCCESS' as any },
+        }),
+        this.prisma.transaction.aggregate({
+          where: { merchantId, status: 'SUCCESS' as any },
+          _sum: { amount: true },
+        }),
+      ]);
+
+    if (!merchant) {
+      throw new NotFoundException('Merchant not found');
+    }
+
+    return {
+      tpv: successfulSum._sum.amount?.toNumber() ?? 0,
+      successRate:
+        totalTransactions === 0
+          ? 0
+          : Number(((successfulTransactions / totalTransactions) * 100).toFixed(1)),
+      balance: merchant.balance.toNumber(),
+      totalTransactions,
+    };
+  }
+
+  async getMerchantTrend(merchantId: string, daysParam?: string) {
+    await this.expirePendingTransactions();
+
+    const days = Math.max(1, Math.min(90, Number(daysParam) || 30));
+    const startDate = new Date();
+    startDate.setHours(0, 0, 0, 0);
+    startDate.setDate(startDate.getDate() - (days - 1));
+
+    const transactions = await this.prisma.transaction.findMany({
+      where: {
+        merchantId,
+        createdAt: { gte: startDate },
+      },
+      select: {
+        amount: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const buckets = new Map<string, { amount: number; count: number }>();
+    for (let index = 0; index < days; index += 1) {
+      const date = new Date(startDate);
+      date.setDate(startDate.getDate() + index);
+      const key = date.toISOString().slice(0, 10);
+      buckets.set(key, { amount: 0, count: 0 });
+    }
+
+    for (const transaction of transactions) {
+      const key = transaction.createdAt.toISOString().slice(0, 10);
+      const bucket = buckets.get(key);
+      if (!bucket) {
+        continue;
+      }
+      bucket.amount += transaction.amount.toNumber();
+      bucket.count += 1;
+    }
+
+    return Array.from(buckets.entries()).map(([date, value]) => ({
+      date,
+      amount: value.amount,
+      count: value.count,
+    }));
+  }
+
+  async getWebhookConfig(merchantId: string) {
+    const merchant = await this.prisma.merchant.findUnique({
+      where: { id: merchantId },
+      select: { webhookUrl: true, updatedAt: true },
+    });
+
+    if (!merchant) {
+      throw new NotFoundException('Merchant not found');
+    }
+
+    return {
+      url: merchant.webhookUrl ?? '',
+      enabled: Boolean(merchant.webhookUrl),
+      lastTestAt: null,
+    };
+  }
+
+  async updateWebhookUrl(merchantId: string, url: string) {
+    const merchant = await this.prisma.merchant.update({
+      where: { id: merchantId },
+      data: { webhookUrl: url },
+      select: { webhookUrl: true },
+    });
+
+    return {
+      url: merchant.webhookUrl ?? '',
+      enabled: Boolean(merchant.webhookUrl),
+      lastTestAt: null,
+    };
+  }
+
+  async testWebhook(merchantId: string) {
+    const merchant = await this.prisma.merchant.findUnique({
+      where: { id: merchantId },
+      select: { webhookUrl: true, name: true },
+    });
+
+    if (!merchant) {
+      throw new NotFoundException('Merchant not found');
+    }
+
+    if (!merchant.webhookUrl) {
+      throw new BadRequestException('Webhook URL is not configured');
+    }
+
+    const payload = {
+      event: 'webhook.test',
+      merchantName: merchant.name,
+      sentAt: new Date().toISOString(),
+      message: 'SinarPay webhook connectivity test',
+    };
+
+    const response = await fetch(merchant.webhookUrl, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        accept: 'application/json, text/plain;q=0.9, */*;q=0.8',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const responseText = await response.text();
+
+    return {
+      success: response.ok,
+      statusCode: response.status,
+      response: responseText || response.statusText || 'No response body',
+    };
   }
 
   async searchTransactions(merchantId: string, dto: SearchTransactionsDto) {

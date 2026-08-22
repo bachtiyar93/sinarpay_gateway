@@ -109,6 +109,26 @@ Note: frontend runs on port 3001, while backend API stays on port 3000.
 - Health: `http://localhost:3000/api/health`
 - Login endpoint: `POST http://localhost:3000/api/auth/login`
 
+## Merchant API endpoints
+
+- `GET /api/v1/merchant/profile` - load merchant profile summary
+- `GET /api/v1/merchant/api-keys` - load active merchant API key list
+- `POST /api/v1/merchant/api-keys/:keyId/regenerate` - regenerate active merchant API key
+- `GET /api/v1/merchant/analytics` - load dashboard analytics summary
+- `GET /api/v1/merchant/analytics/trend?days=7` - load dashboard trend data
+- `POST /api/v1/payments` - create QRIS payment
+- `POST /api/v1/merchant/transactions/search` - list/search merchant transactions
+- `GET /api/v1/merchant/transactions/:transactionId` - transaction detail with real history
+- `POST /api/v1/merchant/transactions/:transactionId/refund` - refund a successful transaction
+- `GET /api/v1/merchant/webhook-url` - load current merchant webhook URL
+- `PUT /api/v1/merchant/webhook-url` - update merchant webhook URL
+- `POST /api/v1/merchant/webhook/test` - send webhook test request to the configured merchant URL
+
+## Local testing endpoints
+
+- `POST /api/test/bank-payment-confirm` - simulate bank callback status update
+- `POST /api/test/webhook-receiver` - local webhook receiver for development testing
+
 ## Notes
 
 - Backend uses strict TypeScript.

@@ -32,7 +32,7 @@ export default function ProfilePage() {
           </div>
           <div className="flex items-center justify-between border-b border-slate-800 pb-3">
             <span className="text-slate-400">Email</span>
-            <span className="font-medium text-white">{data.email}</span>
+            <span className="font-medium text-white">{data.email ?? "-"}</span>
           </div>
           <div className="flex items-center justify-between border-b border-slate-800 pb-3">
             <span className="text-slate-400">Status</span>

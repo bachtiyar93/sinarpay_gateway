@@ -1,4 +1,15 @@
-import { Controller, Post, Body, UseGuards, Req, Get, Param } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  UseGuards,
+  Req,
+  Get,
+  Param,
+  Put,
+  BadRequestException,
+  Query,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { TransactionService } from './transactions.service';
@@ -97,5 +108,124 @@ export class TransactionController {
       throw new Error('Merchant ID not found in request');
     }
     return this.transactionService.refundTransaction(transactionId, merchantId);
+  }
+
+  @Get('merchant/profile')
+  @UseGuards(ApiKeyGuard)
+  @ApiOperation({ summary: 'Get merchant profile' })
+  @ApiResponse({ status: 200, description: 'Merchant profile retrieved successfully' })
+  @ApiResponse({ status: 401, description: 'Invalid API key' })
+  async getMerchantProfile(@Req() req: MerchantRequest) {
+    const merchantId = req.user?.merchantId;
+    if (!merchantId) {
+      throw new Error('Merchant ID not found in request');
+    }
+    return this.transactionService.getMerchantProfile(merchantId);
+  }
+
+  @Get('merchant/api-keys')
+  @UseGuards(ApiKeyGuard)
+  @ApiOperation({ summary: 'Get merchant API keys' })
+  @ApiResponse({ status: 200, description: 'Merchant API keys retrieved successfully' })
+  @ApiResponse({ status: 401, description: 'Invalid API key' })
+  async getMerchantApiKeys(@Req() req: MerchantRequest) {
+    const merchantId = req.user?.merchantId;
+    if (!merchantId) {
+      throw new Error('Merchant ID not found in request');
+    }
+    return this.transactionService.getMerchantApiKeys(merchantId);
+  }
+
+  @Post('merchant/api-keys/:keyId/regenerate')
+  @UseGuards(ApiKeyGuard)
+  @ApiOperation({ summary: 'Regenerate merchant API key' })
+  @ApiResponse({ status: 200, description: 'Merchant API key regenerated successfully' })
+  @ApiResponse({ status: 401, description: 'Invalid API key' })
+  @ApiResponse({ status: 404, description: 'API key not found' })
+  async regenerateMerchantApiKey(
+    @Param('keyId') keyId: string,
+    @Req() req: MerchantRequest,
+  ) {
+    const merchantId = req.user?.merchantId;
+    if (!merchantId) {
+      throw new Error('Merchant ID not found in request');
+    }
+    return this.transactionService.regenerateMerchantApiKey(merchantId, keyId);
+  }
+
+  @Get('merchant/analytics')
+  @UseGuards(ApiKeyGuard)
+  @ApiOperation({ summary: 'Get merchant analytics summary' })
+  @ApiResponse({ status: 200, description: 'Merchant analytics retrieved successfully' })
+  @ApiResponse({ status: 401, description: 'Invalid API key' })
+  async getMerchantAnalytics(@Req() req: MerchantRequest) {
+    const merchantId = req.user?.merchantId;
+    if (!merchantId) {
+      throw new Error('Merchant ID not found in request');
+    }
+    return this.transactionService.getMerchantAnalytics(merchantId);
+  }
+
+  @Get('merchant/analytics/trend')
+  @UseGuards(ApiKeyGuard)
+  @ApiOperation({ summary: 'Get merchant transaction trend' })
+  @ApiResponse({ status: 200, description: 'Merchant transaction trend retrieved successfully' })
+  @ApiResponse({ status: 401, description: 'Invalid API key' })
+  async getMerchantTrend(
+    @Req() req: MerchantRequest,
+    @Query('days') days?: string,
+  ) {
+    const merchantId = req.user?.merchantId;
+    if (!merchantId) {
+      throw new Error('Merchant ID not found in request');
+    }
+    return this.transactionService.getMerchantTrend(merchantId, days);
+  }
+
+  @Get('merchant/webhook-url')
+  @UseGuards(ApiKeyGuard)
+  @ApiOperation({ summary: 'Get merchant webhook URL' })
+  @ApiResponse({ status: 200, description: 'Webhook URL retrieved successfully' })
+  @ApiResponse({ status: 401, description: 'Invalid API key' })
+  async getWebhookUrl(@Req() req: MerchantRequest) {
+    const merchantId = req.user?.merchantId;
+    if (!merchantId) {
+      throw new Error('Merchant ID not found in request');
+    }
+    return this.transactionService.getWebhookConfig(merchantId);
+  }
+
+  @Put('merchant/webhook-url')
+  @UseGuards(ApiKeyGuard)
+  @ApiOperation({ summary: 'Update merchant webhook URL' })
+  @ApiResponse({ status: 200, description: 'Webhook URL updated successfully' })
+  @ApiResponse({ status: 400, description: 'Webhook URL is required' })
+  @ApiResponse({ status: 401, description: 'Invalid API key' })
+  async updateWebhookUrl(
+    @Body() body: { url?: string },
+    @Req() req: MerchantRequest,
+  ) {
+    const merchantId = req.user?.merchantId;
+    if (!merchantId) {
+      throw new Error('Merchant ID not found in request');
+    }
+    if (!body?.url) {
+      throw new BadRequestException('Webhook URL is required');
+    }
+    return this.transactionService.updateWebhookUrl(merchantId, body.url);
+  }
+
+  @Post('merchant/webhook/test')
+  @UseGuards(ApiKeyGuard)
+  @ApiOperation({ summary: 'Send test webhook to merchant URL' })
+  @ApiResponse({ status: 200, description: 'Webhook test completed' })
+  @ApiResponse({ status: 400, description: 'Webhook URL is not configured' })
+  @ApiResponse({ status: 401, description: 'Invalid API key' })
+  async testWebhook(@Req() req: MerchantRequest) {
+    const merchantId = req.user?.merchantId;
+    if (!merchantId) {
+      throw new Error('Merchant ID not found in request');
+    }
+    return this.transactionService.testWebhook(merchantId);
   }
 }

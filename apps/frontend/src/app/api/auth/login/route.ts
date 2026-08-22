@@ -55,20 +55,22 @@ export async function POST(request: Request) {
   const decodedRole =
     tokenPayload?.role === "MERCHANT" || tokenPayload?.role === "OPS"
       ? tokenPayload.role
-      : "OPS";
-  const fallbackUser = {
-    id: data.user?.id ?? tokenPayload?.sub ?? "user-default",
-    role: data.user?.role ?? decodedRole,
-    merchantId: data.user?.merchantId ?? tokenPayload?.merchantId ?? "merchant-default",
-    merchantName: data.user?.merchantName ?? tokenPayload?.merchantId ?? "Merchant",
-  };
-  const merchantName = fallbackUser.merchantName;
+      : null;
+  const resolvedUserId = data.user?.id ?? tokenPayload?.sub ?? null;
+  const resolvedRole = data.user?.role ?? decodedRole;
+
+  if (!resolvedUserId || !resolvedRole) {
+    return NextResponse.json({ message: "Respons login backend tidak menyediakan identitas user yang valid" }, { status: 502 });
+  }
+
+  const merchantId = data.user?.merchantId ?? resolvedUserId;
+  const merchantName = data.user?.merchantName ?? merchantId;
 
   const jsonResponse = NextResponse.json({
     user: {
-      id: fallbackUser.id,
-      role: fallbackUser.role,
-      merchantId: fallbackUser.merchantId,
+      id: resolvedUserId,
+      role: resolvedRole,
+      merchantId,
       merchantName,
     },
   });
@@ -91,13 +93,13 @@ export async function POST(request: Request) {
     });
   }
 
-  jsonResponse.cookies.set(AUTH_COOKIES.role, fallbackUser.role, {
+  jsonResponse.cookies.set(AUTH_COOKIES.role, resolvedRole, {
     sameSite: "lax",
     path: "/",
     secure: process.env.NODE_ENV === "production",
     maxAge: 60 * 60,
   });
-  jsonResponse.cookies.set(AUTH_COOKIES.merchantId, fallbackUser.merchantId, {
+  jsonResponse.cookies.set(AUTH_COOKIES.merchantId, merchantId, {
     sameSite: "lax",
     path: "/",
     secure: process.env.NODE_ENV === "production",

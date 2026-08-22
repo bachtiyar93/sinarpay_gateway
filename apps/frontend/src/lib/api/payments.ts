@@ -28,25 +28,14 @@ export type PaymentSimulationResult = {
 
 const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000").replace(/\/$/, "");
 const apiBaseUrl = `${baseUrl}/api`;
-const merchantApiKey = process.env.NEXT_PUBLIC_MERCHANT_API_KEY ?? "merchant-demo-key";
+const fallbackMerchantApiKey = process.env.NEXT_PUBLIC_MERCHANT_API_KEY ?? "merchant-demo-key";
 
-function buildFallbackPayment(payload: CreatePaymentPayload): PaymentResult {
-  const now = new Date();
-  const transactionId = `TXN-${Math.random().toString(36).slice(2, 10).toUpperCase()}`;
-  const expiresAt = new Date(now.getTime() + 60 * 1000).toISOString();
-  const chosenCurrency = payload.currency ?? "IDR";
-  const qrisString = `QRIS:${chosenCurrency}:${payload.amount}:${transactionId}`;
+function getMerchantApiKey() {
+  if (typeof window !== "undefined") {
+    return window.localStorage.getItem("merchantApiKey") ?? fallbackMerchantApiKey;
+  }
 
-  return {
-    transactionId,
-    qrisString,
-    amount: Number(payload.amount),
-    currency: chosenCurrency,
-    status: "PENDING",
-    expiresAt,
-    description: payload.description,
-    paymentLink: `${window.location.origin}/pay/${transactionId}`,
-  };
+  return fallbackMerchantApiKey;
 }
 
 export async function createPayment(payload: CreatePaymentPayload): Promise<PaymentResult> {
@@ -61,7 +50,7 @@ export async function createPayment(payload: CreatePaymentPayload): Promise<Paym
     headers: {
       "content-type": "application/json",
       Accept: "application/json",
-      "x-api-key": merchantApiKey,
+      "x-api-key": getMerchantApiKey(),
     },
     body: JSON.stringify(requestBody),
     cache: "no-store",

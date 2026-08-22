@@ -1,8 +1,8 @@
 export type MerchantProfile = {
   id: string;
   name: string;
-  email: string;
-  status: "ACTIVE" | "INACTIVE" | "PENDING";
+  email?: string | null;
+  status: "ACTIVE" | "INACTIVE" | "SUSPENDED";
   createdAt: string;
   balance: number;
 };
@@ -20,121 +20,108 @@ export type WebhookConfig = {
   lastTestAt?: string | null;
 };
 
-const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
+const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000").replace(/\/$/, "");
+const apiBaseUrl = `${baseUrl}/api`;
+const fallbackMerchantApiKey = process.env.NEXT_PUBLIC_MERCHANT_API_KEY ?? "merchant-demo-key";
 
-const mockProfile: MerchantProfile = {
-  id: "MERCHANT-1001",
-  name: "Nadia Ayu",
-  email: "nadia@sinarpay.id",
-  status: "ACTIVE",
-  createdAt: "2026-06-03T09:30:00Z",
-  balance: 24500000,
-};
+function getMerchantApiKey() {
+  if (typeof window !== "undefined") {
+    return window.localStorage.getItem("merchantApiKey") ?? fallbackMerchantApiKey;
+  }
 
-const mockApiKeys: ApiKeyItem[] = [
-  {
-    id: "key-001",
-    key: "demo-api-key-001",
-    createdAt: "2026-08-01T09:30:00Z",
-    lastUsedAt: "2026-08-22T17:14:00Z",
-  },
-];
+  return fallbackMerchantApiKey;
+}
 
-const mockWebhook: WebhookConfig = {
-  url: "https://hooks.example.com/sinarpay/merchant-1001",
-  enabled: true,
-  lastTestAt: "2026-08-21T14:12:00Z",
-};
+function persistMerchantApiKey(apiKey: string) {
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem("merchantApiKey", apiKey);
+  }
+}
 
 export async function getMerchantProfile(): Promise<MerchantProfile> {
-  try {
-    const response = await fetch(`${baseUrl}/v1/merchant/profile`, { cache: "no-store" });
-    if (!response.ok) {
-      return mockProfile;
-    }
-    return (await response.json()) as MerchantProfile;
-  } catch {
-    return mockProfile;
+  const response = await fetch(`${apiBaseUrl}/v1/merchant/profile`, {
+    cache: "no-store",
+    headers: { Accept: "application/json", "x-api-key": getMerchantApiKey() },
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `Failed to load merchant profile: ${response.status}`);
   }
+  return (await response.json()) as MerchantProfile;
 }
 
 export async function getApiKeys(): Promise<ApiKeyItem[]> {
-  try {
-    const response = await fetch(`${baseUrl}/v1/merchant/api-keys`, { cache: "no-store" });
-    if (!response.ok) {
-      return mockApiKeys;
-    }
-    return (await response.json()) as ApiKeyItem[];
-  } catch {
-    return mockApiKeys;
+  const response = await fetch(`${apiBaseUrl}/v1/merchant/api-keys`, {
+    cache: "no-store",
+    headers: { Accept: "application/json", "x-api-key": getMerchantApiKey() },
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `Failed to load API keys: ${response.status}`);
   }
+  return (await response.json()) as ApiKeyItem[];
 }
 
 export async function regenerateApiKey(id: string): Promise<ApiKeyItem> {
-  try {
-    const response = await fetch(`${baseUrl}/v1/merchant/api-keys/${id}/regenerate`, {
-      method: "POST",
-      cache: "no-store",
-    });
-    if (!response.ok) {
-      return {
-        ...mockApiKeys[0],
-        id,
-        key: `demo-api-key-${Math.random().toString(36).slice(2, 18)}`,
-        createdAt: new Date().toISOString(),
-      };
-    }
-    return (await response.json()) as ApiKeyItem;
-  } catch {
-    return {
-      ...mockApiKeys[0],
-      id,
-      key: `demo-api-key-${Math.random().toString(36).slice(2, 18)}`,
-      createdAt: new Date().toISOString(),
-    };
+  const response = await fetch(`${apiBaseUrl}/v1/merchant/api-keys/${id}/regenerate`, {
+    method: "POST",
+    cache: "no-store",
+    headers: {
+      Accept: "application/json",
+      "x-api-key": getMerchantApiKey(),
+    },
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `Failed to regenerate API key: ${response.status}`);
   }
+  const data = (await response.json()) as ApiKeyItem;
+  persistMerchantApiKey(data.key);
+  return data;
 }
 
 export async function getWebhookUrl(): Promise<WebhookConfig> {
-  try {
-    const response = await fetch(`${baseUrl}/v1/merchant/webhook-url`, { cache: "no-store" });
-    if (!response.ok) {
-      return mockWebhook;
-    }
-    return (await response.json()) as WebhookConfig;
-  } catch {
-    return mockWebhook;
+  const response = await fetch(`${apiBaseUrl}/v1/merchant/webhook-url`, {
+    cache: "no-store",
+    headers: { Accept: "application/json", "x-api-key": getMerchantApiKey() },
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `Failed to load webhook URL: ${response.status}`);
   }
+  return (await response.json()) as WebhookConfig;
 }
 
 export async function updateWebhookUrl(url: string): Promise<WebhookConfig> {
-  try {
-    const response = await fetch(`${baseUrl}/v1/merchant/webhook-url`, {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ url }),
-      cache: "no-store",
-    });
-    if (!response.ok) {
-      return { ...mockWebhook, url };
-    }
-    return (await response.json()) as WebhookConfig;
-  } catch {
-    return { ...mockWebhook, url };
+  const response = await fetch(`${apiBaseUrl}/v1/merchant/webhook-url`, {
+    method: "PUT",
+    headers: {
+      "content-type": "application/json",
+      Accept: "application/json",
+      "x-api-key": getMerchantApiKey(),
+    },
+    body: JSON.stringify({ url }),
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `Failed to update webhook URL: ${response.status}`);
   }
+  return (await response.json()) as WebhookConfig;
 }
 
 export async function testWebhook(): Promise<{ success: boolean; statusCode: number; response: string }> {
-  try {
-    const response = await fetch(`${baseUrl}/v1/merchant/webhook/test`, {
-      method: "POST",
-      cache: "no-store",
-    });
-    if (!response.ok) {
-      return { success: false, statusCode: response.status, response: "Webhook test failed" };
-    }
-    return (await response.json()) as { success: boolean; statusCode: number; response: string };
-  } catch {
-    return { success: true, statusCode: 200, response: "Webhook test succeeded using mock endpoint." };
+  const response = await fetch(`${apiBaseUrl}/v1/merchant/webhook/test`, {
+    method: "POST",
+    cache: "no-store",
+    headers: {
+      Accept: "application/json",
+      "x-api-key": getMerchantApiKey(),
+    },
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `Webhook test failed: ${response.status}`);
   }
+  return (await response.json()) as { success: boolean; statusCode: number; response: string };
 }
