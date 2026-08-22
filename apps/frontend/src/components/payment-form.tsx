@@ -15,7 +15,7 @@ const paymentSchema = z.object({
 type PaymentFormValues = z.infer<typeof paymentSchema>;
 
 export function PaymentForm() {
-  const { amount, description, currency, isSubmitting, setDraft, setResult, setSubmitting } = usePaymentGeneratorStore();
+  const { amount, description, currency, isSubmitting, setDraft, setResult, setSubmitting, setIdempotencyKey } = usePaymentGeneratorStore();
   const queryClient = useQueryClient();
   const form = useForm<PaymentFormValues>({
     defaultValues: {
@@ -68,6 +68,9 @@ export function PaymentForm() {
       
       form.reset({ amount: 0, description: "", currency: sanitizedValues.currency });
       setDraft({ amount: "", description: "", currency: sanitizedValues.currency });
+      
+      // Clear idempotency key after successful payment (important!)
+      setIdempotencyKey("");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to create payment.";
       form.setError("amount", { type: "manual", message: `Payment creation failed: ${message}` });

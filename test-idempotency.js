@@ -14,8 +14,8 @@
 const baseUrl = process.env.BACKEND_URL || 'http://localhost:3000';
 const merchantApiKey = process.env.MERCHANT_API_KEY || 'merchant-demo-key';
 
-// Generate test idempotency key
-const testKey = '12345678-1234-5678-1234-567812345678';
+// Generate test idempotency key (valid v4 UUID format)
+const testKey = 'a1b2c3d4-1234-5678-9abc-def012345678';
 
 async function test() {
   console.log('🧪 Testing Idempotency Key System');
