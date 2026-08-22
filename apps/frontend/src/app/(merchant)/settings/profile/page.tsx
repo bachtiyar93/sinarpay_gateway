@@ -3,7 +3,12 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AUTH_COOKIES } from "@/lib/auth";
-import { getMerchantProfile, updateMerchantProfile } from "@/lib/api/settings";
+import {
+  getLoginProfile,
+  getMerchantProfile,
+  updateLoginProfile,
+  updateMerchantProfile,
+} from "@/lib/api/settings";
 import { useSessionStore } from "@/stores/session.store";
 
 export default function ProfilePage() {
@@ -13,8 +18,16 @@ export default function ProfilePage() {
     queryKey: ["merchant-profile"],
     queryFn: getMerchantProfile,
   });
+  const loginProfileQuery = useQuery({
+    queryKey: ["login-profile"],
+    queryFn: getLoginProfile,
+  });
   const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [clientError, setClientError] = useState<string | null>(null);
 
   useEffect(() => {
     if (data?.name) {
@@ -22,12 +35,18 @@ export default function ProfilePage() {
     }
   }, [data?.name]);
 
+  useEffect(() => {
+    if (loginProfileQuery.data?.email) {
+      setEmail(loginProfileQuery.data.email);
+    }
+  }, [loginProfileQuery.data?.email]);
+
   const updateMutation = useMutation({
     mutationFn: (nextName: string) => updateMerchantProfile(nextName),
     onSuccess: (updated) => {
       queryClient.setQueryData(["merchant-profile"], updated);
       setSession({
-        role: "OPS",
+        role: (loginProfileQuery.data?.role as "MERCHANT" | "OPS" | "ADMIN" | undefined) ?? "ADMIN",
         merchantId: updated.id,
         merchantName: updated.name,
       });
@@ -36,18 +55,37 @@ export default function ProfilePage() {
       setSuccessMessage("Profile berhasil diperbarui.");
     },
   });
+  const updateLoginMutation = useMutation({
+    mutationFn: (payload: { email: string; password?: string }) => updateLoginProfile(payload),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(["login-profile"], updated);
+    },
+  });
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSuccessMessage(null);
+    setClientError(null);
+    if (password && password !== confirmPassword) {
+      setClientError("Konfirmasi password tidak sama.");
+      return;
+    }
+
     await updateMutation.mutateAsync(name);
+    await updateLoginMutation.mutateAsync({
+      email,
+      password: password || undefined,
+    });
+    setPassword("");
+    setConfirmPassword("");
+    setSuccessMessage("Profile dan kredensial login berhasil diperbarui.");
   }
 
-  if (isLoading) {
+  if (isLoading || loginProfileQuery.isLoading) {
     return <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-6 text-slate-400">Loading profile...</div>;
   }
 
-  if (error || !data) {
+  if (error || !data || loginProfileQuery.error || !loginProfileQuery.data) {
     return (
       <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-6 text-sm text-rose-300">
         Unable to load merchant profile.
@@ -71,8 +109,33 @@ export default function ProfilePage() {
           </label>
           <div className="flex items-center justify-between border-b border-slate-800 pb-3">
             <span className="text-slate-400">Email</span>
-            <span className="font-medium text-white">{data.email ?? "-"}</span>
+            <input
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              className="w-full max-w-sm rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white outline-none transition focus:border-indigo-500"
+              placeholder="Email login"
+            />
           </div>
+          <label className="block">
+            <span className="mb-2 block text-slate-400">Password baru</span>
+            <input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white outline-none transition focus:border-indigo-500"
+              placeholder="Kosongkan jika tidak ingin mengubah password"
+            />
+          </label>
+          <label className="block">
+            <span className="mb-2 block text-slate-400">Konfirmasi password baru</span>
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(event) => setConfirmPassword(event.target.value)}
+              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white outline-none transition focus:border-indigo-500"
+              placeholder="Ulangi password baru"
+            />
+          </label>
           <div className="flex items-center justify-between border-b border-slate-800 pb-3">
             <span className="text-slate-400">Status</span>
             <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-xs uppercase text-emerald-400">
@@ -90,15 +153,20 @@ export default function ProfilePage() {
         <div className="mt-5 flex items-center gap-3">
           <button
             type="submit"
-            disabled={updateMutation.isPending}
+            disabled={updateMutation.isPending || updateLoginMutation.isPending}
             className="rounded-lg bg-indigo-500 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {updateMutation.isPending ? "Saving..." : "Save profile"}
+            {updateMutation.isPending || updateLoginMutation.isPending ? "Saving..." : "Save profile"}
           </button>
           {successMessage ? <p className="text-sm text-emerald-300">{successMessage}</p> : null}
-          {updateMutation.error ? (
+          {clientError ? <p className="text-sm text-rose-300">{clientError}</p> : null}
+          {updateMutation.error || updateLoginMutation.error ? (
             <p className="text-sm text-rose-300">
-              {updateMutation.error instanceof Error ? updateMutation.error.message : "Gagal memperbarui profile."}
+              {updateMutation.error instanceof Error
+                ? updateMutation.error.message
+                : updateLoginMutation.error instanceof Error
+                  ? updateLoginMutation.error.message
+                  : "Gagal memperbarui profile."}
             </p>
           ) : null}
         </div>

@@ -57,6 +57,78 @@ export class AuthService {
     }
   }
 
+  async getCurrentUser(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+      },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    return user;
+  }
+
+  async updateCurrentUser(
+    userId: string,
+    updates: { email?: string; password?: string },
+  ) {
+    const existingUser = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true },
+    });
+
+    if (!existingUser) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const nextEmail = updates.email?.trim();
+    const nextPassword = updates.password?.trim();
+
+    if (!nextEmail && !nextPassword) {
+      throw new BadRequestException('Email or password update is required');
+    }
+
+    if (nextEmail && nextEmail !== existingUser.email) {
+      const emailOwner = await this.prisma.user.findUnique({
+        where: { email: nextEmail },
+        select: { id: true },
+      });
+      if (emailOwner && emailOwner.id !== userId) {
+        throw new BadRequestException('Email already in use');
+      }
+    }
+
+    if (nextPassword && nextPassword.length < 8) {
+      throw new BadRequestException('Password minimal 8 karakter');
+    }
+
+    const data: { email?: string; passwordHash?: string } = {};
+    if (nextEmail) {
+      data.email = nextEmail;
+    }
+    if (nextPassword) {
+      data.passwordHash = await bcrypt.hash(nextPassword, 12);
+    }
+
+    return this.prisma.user.update({
+      where: { id: userId },
+      data,
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+      },
+    });
+  }
+
   async validateApiKey(apiKey: string): Promise<string> {
     const merchant = await this.prisma.merchant.findUnique({
       where: { apiKeyHash: apiKey },

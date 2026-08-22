@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export type MerchantRole = "MERCHANT" | "OPS" | null;
+export type MerchantRole = "MERCHANT" | "OPS" | "ADMIN" | null;
 
 type SessionState = {
   isAuthenticated: boolean;

@@ -7,6 +7,13 @@ export type MerchantProfile = {
   balance: number;
 };
 
+export type LoginProfile = {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+};
+
 export type ApiKeyItem = {
   id: string;
   key: string;
@@ -66,6 +73,40 @@ export async function updateMerchantProfile(name: string): Promise<MerchantProfi
     throw new Error(text || `Failed to update merchant profile: ${response.status}`);
   }
   return (await response.json()) as MerchantProfile;
+}
+
+export async function getLoginProfile(): Promise<LoginProfile> {
+  const response = await fetch("/api/account/profile", {
+    cache: "no-store",
+    headers: {
+      Accept: "application/json",
+    },
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `Failed to load login profile: ${response.status}`);
+  }
+  return (await response.json()) as LoginProfile;
+}
+
+export async function updateLoginProfile(payload: {
+  email: string;
+  password?: string;
+}): Promise<LoginProfile> {
+  const response = await fetch("/api/account/profile", {
+    method: "PUT",
+    cache: "no-store",
+    headers: {
+      "content-type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `Failed to update login profile: ${response.status}`);
+  }
+  return (await response.json()) as LoginProfile;
 }
 
 export async function getApiKeys(): Promise<ApiKeyItem[]> {

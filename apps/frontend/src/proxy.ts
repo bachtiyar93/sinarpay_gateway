@@ -34,7 +34,7 @@ export function proxy(request: NextRequest) {
     }
 
     const role = getRoleFromToken(token) ?? request.cookies.get(AUTH_COOKIES.role)?.value;
-    if (role !== "MERCHANT" && role !== "OPS") {
+    if (role !== "MERCHANT" && role !== "OPS" && role !== "ADMIN") {
       return redirectToLogin(request);
     }
   }

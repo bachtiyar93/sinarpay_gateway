@@ -125,6 +125,11 @@ Note: frontend runs on port 3001, while backend API stays on port 3000.
 - `PUT /api/v1/merchant/webhook-url` - update merchant webhook URL
 - `POST /api/v1/merchant/webhook/test` - send webhook test request to the configured merchant URL
 
+## Auth account endpoints
+
+- `GET /api/auth/me` - load current login account profile
+- `PUT /api/auth/me` - update current login email and/or password
+
 ## Local testing endpoints
 
 - `POST /api/test/bank-payment-confirm` - simulate bank callback status update

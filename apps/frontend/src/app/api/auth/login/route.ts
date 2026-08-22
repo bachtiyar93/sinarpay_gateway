@@ -53,7 +53,7 @@ export async function POST(request: Request) {
 
   const tokenPayload = data.accessToken ? decodeJwtPayload(data.accessToken) : null;
   const decodedRole =
-    tokenPayload?.role === "MERCHANT" || tokenPayload?.role === "OPS"
+    tokenPayload?.role === "MERCHANT" || tokenPayload?.role === "OPS" || tokenPayload?.role === "ADMIN"
       ? tokenPayload.role
       : null;
   const resolvedUserId = data.user?.id ?? tokenPayload?.sub ?? null;

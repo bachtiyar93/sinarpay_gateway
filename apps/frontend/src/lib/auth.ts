@@ -6,7 +6,7 @@ export const AUTH_COOKIES = {
   merchantName: "merchant_name",
 } as const;
 
-export type UserRole = "MERCHANT" | "OPS";
+export type UserRole = "MERCHANT" | "OPS" | "ADMIN";
 
 export type AuthUser = {
   id: string;
@@ -62,7 +62,7 @@ export function getRoleFromToken(token: string): UserRole | null {
   const payload = decodeJwtPayload(token);
   const role = payload?.role;
 
-  if (role === "MERCHANT" || role === "OPS") {
+  if (role === "MERCHANT" || role === "OPS" || role === "ADMIN") {
     return role;
   }
 
