@@ -13,6 +13,7 @@ export function PaymentResult({ result }: { result: PaymentResultType | null }) 
   const [simulationState, setSimulationState] = useState<{ success: boolean; status: string; message: string } | null>(null);
   const [simulating, setSimulating] = useState(false);
   const [bypassExecuted, setBypassExecuted] = useState(false);
+  const [remainingSeconds, setRemainingSeconds] = useState(0);
   const { setResult } = usePaymentGeneratorStore();
   const queryClient = useQueryClient();
 
@@ -44,6 +45,40 @@ export function PaymentResult({ result }: { result: PaymentResultType | null }) 
       active = false;
     };
   }, [result?.qrisString]);
+
+  useEffect(() => {
+    if (!result?.expiresAt || bypassExecuted) {
+      setRemainingSeconds(0);
+      return;
+    }
+
+    const tick = () => {
+      const seconds = Math.max(0, Math.ceil((new Date(result.expiresAt).getTime() - Date.now()) / 1000));
+      setRemainingSeconds(seconds);
+
+      if (seconds === 0) {
+        setSimulationState({
+          success: true,
+          status: "EXPIRED",
+          message: "Payment expired automatically.",
+        });
+        setBypassExecuted(true);
+        queryClient.invalidateQueries({ queryKey: ["transactions"] });
+        setTimeout(() => {
+          setResult(null);
+          setBypassExecuted(false);
+          setSimulationState(null);
+        }, 3000);
+      }
+    };
+
+    tick();
+    const timer = window.setInterval(tick, 1000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [bypassExecuted, queryClient, result?.expiresAt, setResult]);
 
   if (!result) {
     return null;
@@ -90,6 +125,8 @@ export function PaymentResult({ result }: { result: PaymentResultType | null }) 
     setBypassExecuted(false);
     setSimulationState(null);
   };
+
+  const countdownLabel = `${String(Math.floor(remainingSeconds / 60)).padStart(2, "0")}:${String(remainingSeconds % 60).padStart(2, "0")}`;
 
   return (
     <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/5 p-5 shadow-lg">
@@ -152,6 +189,16 @@ export function PaymentResult({ result }: { result: PaymentResultType | null }) 
           </p>
         </div>
       </div>
+
+      {!bypassExecuted && result.status === "PENDING" ? (
+        <div className="mt-4 rounded-xl border border-amber-500/25 bg-amber-500/5 p-3">
+          <p className="text-sm text-amber-200">Auto-expire countdown</p>
+          <p className="mt-2 text-2xl font-semibold text-white">{countdownLabel}</p>
+          <p className="mt-1 text-xs text-slate-400">
+            Jika bypass tidak dilakukan sampai hitung mundur habis, status akan berubah otomatis menjadi EXPIRED dan hasil generate dibersihkan.
+          </p>
+        </div>
+      ) : null}
 
       {result.paymentLink ? (
         <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950/70 p-3">

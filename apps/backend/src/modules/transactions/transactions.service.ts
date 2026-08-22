@@ -18,6 +18,7 @@ import {
 } from './transaction-state-machine';
 
 const CURRENCY_WHITELIST = ['IDR', 'USD', 'SGD'];
+const PAYMENT_EXPIRY_MS = 60 * 1000;
 
 @Injectable()
 export class TransactionService {
@@ -58,7 +59,7 @@ export class TransactionService {
     }
 
     // Create transaction
-    const expiredAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+    const expiredAt = new Date(Date.now() + PAYMENT_EXPIRY_MS);
 
     const transaction = await this.prisma.transaction.create({
       data: {
@@ -106,12 +107,15 @@ export class TransactionService {
     return response;
   }
 
-  @Cron('*/30 * * * * *')
+  @Cron('*/5 * * * * *')
   async expirePendingTransactions(): Promise<void> {
     const expiredTransactions = await this.prisma.transaction.findMany({
       where: {
         status: 'PENDING' as any,
-        expiredAt: { lte: new Date() },
+        OR: [
+          { expiredAt: { lte: new Date() } },
+          { createdAt: { lte: new Date(Date.now() - PAYMENT_EXPIRY_MS) } },
+        ],
       },
       select: { id: true },
     });
@@ -182,7 +186,44 @@ export class TransactionService {
     return transaction;
   }
 
+  async getTransactionDetail(transactionId: string, merchantId: string) {
+    await this.expirePendingTransactions();
+
+    const transaction = await this.getTransactionById(transactionId, merchantId);
+
+    return {
+      id: transaction.id,
+      amount: transaction.amount.toNumber(),
+      currency: transaction.currency,
+      status: transaction.status,
+      date: transaction.createdAt.toISOString(),
+      reference: transaction.externalRef || undefined,
+      expiresAt: transaction.expiredAt.toISOString(),
+      history: transaction.history
+        .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+        .map((item) => ({
+          fromStatus: item.fromStatus,
+          status: item.toStatus,
+          reason: item.reason || undefined,
+          at: item.createdAt.toISOString(),
+        })),
+    };
+  }
+
+  async refundTransaction(transactionId: string, merchantId: string) {
+    await this.getTransactionById(transactionId, merchantId);
+    await this.transitionStatus(
+      transactionId,
+      'REFUNDED',
+      'Refund requested by merchant',
+    );
+
+    return this.getTransactionDetail(transactionId, merchantId);
+  }
+
   async searchTransactions(merchantId: string, dto: SearchTransactionsDto) {
+    await this.expirePendingTransactions();
+
     const page = dto.page ?? 1;
     const limit = dto.limit ?? 10;
     const skip = (page - 1) * limit;
@@ -223,7 +264,7 @@ export class TransactionService {
     return {
       items: items.map((item) => ({
         id: item.id,
-        amount: item.amount,
+        amount: item.amount.toNumber(),
         status: item.status,
         date: item.createdAt.toISOString(),
       })),

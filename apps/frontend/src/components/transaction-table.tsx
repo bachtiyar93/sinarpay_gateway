@@ -12,6 +12,7 @@ const statusStyles: Record<string, string> = {
   PENDING: "bg-amber-500/10 text-amber-400 border border-amber-500/30",
   FAILED: "bg-rose-500/10 text-rose-400 border border-rose-500/30",
   EXPIRED: "bg-slate-500/10 text-slate-300 border border-slate-500/30",
+  REFUNDED: "bg-sky-500/10 text-sky-300 border border-sky-500/30",
 };
 
 export function TransactionTable({ rows }: TransactionTableProps) {

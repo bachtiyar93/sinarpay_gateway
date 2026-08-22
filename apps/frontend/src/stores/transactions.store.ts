@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export type TransactionStatus = "ALL" | "SUCCESS" | "PENDING" | "FAILED" | "EXPIRED";
+export type TransactionStatus = "ALL" | "SUCCESS" | "PENDING" | "FAILED" | "EXPIRED" | "REFUNDED";
 
 type TransactionsState = {
   status: TransactionStatus;

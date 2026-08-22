@@ -1,7 +1,7 @@
 export type TransactionRecord = {
   id: string;
   amount: number;
-  status: "SUCCESS" | "PENDING" | "FAILED" | "EXPIRED";
+  status: "SUCCESS" | "PENDING" | "FAILED" | "EXPIRED" | "REFUNDED";
   date: string;
   description?: string;
   reference?: string;
@@ -14,7 +14,20 @@ export type TransactionsResponse = {
   limit: number;
 };
 
-const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
+export type TransactionDetail = TransactionRecord & {
+  currency: string;
+  expiresAt: string;
+  history: Array<{
+    fromStatus?: string | null;
+    status: string;
+    reason?: string;
+    at: string;
+  }>;
+};
+
+const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000").replace(/\/$/, "");
+const apiBaseUrl = `${baseUrl}/api`;
+const merchantApiKey = process.env.NEXT_PUBLIC_MERCHANT_API_KEY ?? "merchant-demo-key";
 
 const mockData: TransactionRecord[] = [
   { id: "TXN-20001", amount: 250000, status: "SUCCESS", date: "2026-08-22T09:15:00Z", description: "Pembelian tiket konser", reference: "INV-9001" },
@@ -30,70 +43,64 @@ const mockData: TransactionRecord[] = [
 ];
 
 export async function getTransactions(filters?: { status?: string; search?: string; page?: number; limit?: number }) {
-  try {
-    const response = await fetch(`${baseUrl}/v1/merchant/transactions/search`, {
-      method: "POST",
-      headers: { "content-type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({
-        status: filters?.status,
-        search: filters?.search,
-        page: filters?.page ?? 1,
-        limit: filters?.limit ?? 10,
-      }),
-      cache: "no-store",
-    });
+  const response = await fetch(`${apiBaseUrl}/v1/merchant/transactions/search`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      Accept: "application/json",
+      "x-api-key": merchantApiKey,
+    },
+    body: JSON.stringify({
+      status: filters?.status,
+      search: filters?.search,
+      page: filters?.page ?? 1,
+      limit: filters?.limit ?? 10,
+    }),
+    cache: "no-store",
+  });
 
-    if (!response.ok) {
-      const filtered = mockData.filter((item) => {
-        const searchText = filters?.search?.toLowerCase() ?? "";
-        const matchesStatus = !filters?.status || filters.status === "ALL" || item.status === filters.status;
-        const matchesSearch = !searchText || item.id.toLowerCase().includes(searchText) || (item.description ?? "").toLowerCase().includes(searchText);
-        return matchesStatus && matchesSearch;
-      });
-
-      const page = filters?.page ?? 1;
-      const limit = filters?.limit ?? 10;
-      const start = (page - 1) * limit;
-      return {
-        items: filtered.slice(start, start + limit),
-        total: filtered.length,
-        page,
-        limit,
-      } satisfies TransactionsResponse;
-    }
-
-    return (await response.json()) as TransactionsResponse;
-  } catch {
-    const filtered = mockData.filter((item) => {
-      const searchText = filters?.search?.toLowerCase() ?? "";
-      const matchesStatus = !filters?.status || filters.status === "ALL" || item.status === filters.status;
-      const matchesSearch = !searchText || item.id.toLowerCase().includes(searchText) || (item.description ?? "").toLowerCase().includes(searchText);
-      return matchesStatus && matchesSearch;
-    });
-
-    const page = filters?.page ?? 1;
-    const limit = filters?.limit ?? 10;
-    const start = (page - 1) * limit;
-    return {
-      items: filtered.slice(start, start + limit),
-      total: filtered.length,
-      page,
-      limit,
-    } satisfies TransactionsResponse;
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `Failed to load transactions: ${response.status}`);
   }
+
+  return (await response.json()) as TransactionsResponse;
 }
 
-export async function getTransactionDetail(id: string) {
-  const row = mockData.find((item) => item.id === id) ?? mockData[0];
-  return {
-    ...row,
-    customer: "Nadia Ayu",
-    merchantId: "MERCHANT-1001",
-    history: [
-      { status: "PENDING", at: "2026-08-22T09:15:00Z" },
-      { status: "SUCCESS", at: "2026-08-22T09:20:00Z" },
-    ],
-  };
+export async function getTransactionDetail(id: string): Promise<TransactionDetail> {
+  const response = await fetch(`${apiBaseUrl}/v1/merchant/transactions/${id}`, {
+    method: "GET",
+    headers: {
+      Accept: "application/json",
+      "x-api-key": merchantApiKey,
+    },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `Failed to load transaction detail: ${response.status}`);
+  }
+
+  return (await response.json()) as TransactionDetail;
+}
+
+export async function refundTransaction(id: string): Promise<TransactionDetail> {
+  const response = await fetch(`${apiBaseUrl}/v1/merchant/transactions/${id}/refund`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "x-api-key": merchantApiKey,
+    },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `Failed to refund transaction: ${response.status}`);
+  }
+
+  return (await response.json()) as TransactionDetail;
 }
 
 export function buildCsv(rows: TransactionRecord[]) {

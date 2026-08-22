@@ -19,7 +19,9 @@ export type RecentTransaction = {
   description?: string;
 };
 
-const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
+const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000").replace(/\/$/, "");
+const apiBaseUrl = `${baseUrl}/api`;
+const merchantApiKey = process.env.NEXT_PUBLIC_MERCHANT_API_KEY ?? "merchant-demo-key";
 
 function formatDate(date: Date, daysAgo: number) {
   const next = new Date(date);
@@ -90,19 +92,25 @@ export async function getTransactionTrend(days = 30): Promise<TrendPoint[]> {
 }
 
 export async function getRecentTransactions(limit = 5): Promise<RecentTransaction[]> {
-  try {
-    const response = await fetch(`${baseUrl}/v1/merchant/transactions?limit=${limit}`, {
-      cache: "no-store",
-      headers: { Accept: "application/json" },
-    });
+  const response = await fetch(`${apiBaseUrl}/v1/merchant/transactions/search`, {
+    method: "POST",
+    cache: "no-store",
+    headers: {
+      "content-type": "application/json",
+      Accept: "application/json",
+      "x-api-key": merchantApiKey,
+    },
+    body: JSON.stringify({
+      page: 1,
+      limit,
+    }),
+  });
 
-    if (!response.ok) {
-      return mockRecentTransactions.slice(0, limit);
-    }
-
-    const data = (await response.json()) as RecentTransaction[];
-    return data.length > 0 ? data : mockRecentTransactions.slice(0, limit);
-  } catch {
-    return mockRecentTransactions.slice(0, limit);
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `Failed to load recent transactions: ${response.status}`);
   }
+
+  const data = (await response.json()) as { items: RecentTransaction[] };
+  return data.items;
 }

@@ -33,7 +33,7 @@ const merchantApiKey = process.env.NEXT_PUBLIC_MERCHANT_API_KEY ?? "merchant-dem
 function buildFallbackPayment(payload: CreatePaymentPayload): PaymentResult {
   const now = new Date();
   const transactionId = `TXN-${Math.random().toString(36).slice(2, 10).toUpperCase()}`;
-  const expiresAt = new Date(now.getTime() + 15 * 60 * 1000).toISOString();
+  const expiresAt = new Date(now.getTime() + 60 * 1000).toISOString();
   const chosenCurrency = payload.currency ?? "IDR";
   const qrisString = `QRIS:${chosenCurrency}:${payload.amount}:${transactionId}`;
 

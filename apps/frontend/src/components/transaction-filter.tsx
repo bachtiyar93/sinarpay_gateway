@@ -6,7 +6,7 @@ type TransactionFilterProps = {
   onSearch: (value: string) => void;
 };
 
-const statusOptions: TransactionStatus[] = ["ALL", "SUCCESS", "PENDING", "FAILED", "EXPIRED"];
+const statusOptions: TransactionStatus[] = ["ALL", "SUCCESS", "PENDING", "FAILED", "EXPIRED", "REFUNDED"];
 
 export function TransactionFilter({ onSearch }: TransactionFilterProps) {
   const { status, search, setStatus, setSearch } = useTransactionsStore();
