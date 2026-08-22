@@ -1,0 +1,145 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  OPS
+}
+
+enum MerchantStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum TransactionStatus {
+  ISSUED
+  PAID
+  EXPIRED
+  CANCELLED
+}
+
+enum WebhookDeliveryStatus {
+  PENDING
+  DELIVERED
+  FAILED
+}
+
+enum ActorType {
+  MERCHANT
+  OPS
+  SYSTEM
+}
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String
+  name         String
+  role         UserRole  @default(OPS)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@map("users")
+}
+
+model Merchant {
+  id             String            @id @default(uuid())
+  name           String
+  apiKeyHash     String            @unique
+  apiSecretHash  String            // Encrypted with AES-256-GCM
+  webhookUrl     String?
+  balance        Decimal           @default(0.00) @db.Decimal(18, 2)
+  status         MerchantStatus    @default(ACTIVE)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  transactions      Transaction[]
+  webhookDeliveries WebhookDelivery[]
+
+  @@map("merchants")
+}
+
+model Transaction {
+  id             String            @id @default(uuid())
+  merchantId     String
+  merchant       Merchant          @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  amount         Decimal           @db.Decimal(18, 2)
+  currency       String            @default("IDR")
+  status         TransactionStatus @default(ISSUED)
+  qrisPayload    String            @db.Text
+  idempotencyKey String            @unique
+  externalRef    String?           // Bank reference id
+  expiredAt      DateTime
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  history           TransactionHistory[]
+  webhookDeliveries WebhookDelivery[]
+
+  @@index([merchantId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("transactions")
+}
+
+model TransactionHistory {
+  id            String             @id @default(uuid())
+  transactionId String
+  transaction   Transaction        @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  fromStatus    TransactionStatus?
+  toStatus      TransactionStatus
+  reason        String?
+  createdAt     DateTime           @default(now())
+
+  @@index([transactionId])
+  @@map("transaction_histories")
+}
+
+model WebhookDelivery {
+  id            String                @id @default(uuid())
+  transactionId String
+  transaction   Transaction           @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  merchantId    String
+  merchant      Merchant              @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  payload       Json
+  status        WebhookDeliveryStatus @default(PENDING)
+  attemptCount  Int                   @default(0)
+  lastAttemptAt DateTime?
+  nextRetryAt   DateTime?
+  responseCode  Int?
+  responseBody  String?               @db.Text
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  @@index([transactionId])
+  @@index([merchantId])
+  @@index([status])
+  @@map("webhook_deliveries")
+}
+
+model AuditLog {
+  id           String    @id @default(uuid())
+  actorId      String?
+  actorType    ActorType
+  action       String
+  resourceType String
+  resourceId   String?
+  metadata     Json?
+  createdAt    DateTime  @default(now())
+
+  @@index([actorId])
+  @@index([action])
+  @@index([resourceType])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
