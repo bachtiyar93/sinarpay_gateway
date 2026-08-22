@@ -1,10 +1,44 @@
 "use client";
 
-import { useState } from "react";
-import type { PaymentResult as PaymentResultType } from "@/lib/api/payments";
+import { useEffect, useState } from "react";
+import QRCode from "qrcode";
+import { simulatePaymentStatus, type PaymentResult as PaymentResultType, type PaymentSimulationStatus } from "@/lib/api/payments";
 
 export function PaymentResult({ result }: { result: PaymentResultType | null }) {
   const [copied, setCopied] = useState(false);
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<PaymentSimulationStatus>("PAID");
+  const [simulationState, setSimulationState] = useState<{ success: boolean; status: string; message: string } | null>(null);
+  const [simulating, setSimulating] = useState(false);
+
+  useEffect(() => {
+    if (!result?.qrisString) {
+      setQrDataUrl(null);
+      return;
+    }
+
+    let active = true;
+
+    QRCode.toDataURL(result.qrisString, {
+      margin: 1,
+      width: 220,
+      errorCorrectionLevel: "M",
+    })
+      .then((dataUrl) => {
+        if (active) {
+          setQrDataUrl(dataUrl);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setQrDataUrl(null);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [result?.qrisString]);
 
   if (!result) {
     return null;
@@ -18,6 +52,17 @@ export function PaymentResult({ result }: { result: PaymentResultType | null }) 
     } catch {
       setCopied(false);
     }
+  };
+
+  const handleSimulateStatus = async () => {
+    setSimulating(true);
+    const response = await simulatePaymentStatus(result.transactionId, selectedStatus);
+    setSimulationState({
+      success: response.success,
+      status: response.status,
+      message: response.message ?? `Status simulated to ${selectedStatus}.`,
+    });
+    setSimulating(false);
   };
 
   return (
@@ -36,22 +81,28 @@ export function PaymentResult({ result }: { result: PaymentResultType | null }) 
         </button>
       </div>
 
-      <div className="mt-5 grid gap-4 md:grid-cols-2">
+      <div className="mt-5 grid gap-5 lg:grid-cols-[220px_1fr]">
         <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
-          <p className="text-sm text-slate-400">Transaction ID</p>
-          <p className="mt-2 break-all font-mono text-sm text-white">{result.transactionId}</p>
+          {qrDataUrl ? (
+            <img src={qrDataUrl} alt="QR code for payment" className="mx-auto block h-[220px] w-[220px] rounded-lg bg-white p-2" />
+          ) : (
+            <div className="flex h-[220px] items-center justify-center rounded-lg border border-dashed border-slate-700 bg-slate-900/70 text-xs text-slate-400">
+              QR preview unavailable
+            </div>
+          )}
         </div>
-        <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
-          <p className="text-sm text-slate-400">Amount</p>
-          <p className="mt-2 text-lg font-semibold text-white">
-            {result.currency} {result.amount.toLocaleString("en-US")}
-          </p>
-        </div>
-      </div>
 
-      <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950/70 p-3">
-        <p className="text-sm text-slate-400">QRIS string</p>
-        <p className="mt-2 break-all font-mono text-xs text-slate-200">{result.qrisString}</p>
+        <div className="space-y-4">
+          <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
+            <p className="text-sm text-slate-400">Transaction ID</p>
+            <p className="mt-2 break-all font-mono text-sm text-white">{result.transactionId}</p>
+          </div>
+
+          <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
+            <p className="text-sm text-slate-400">QRIS string</p>
+            <p className="mt-2 break-all font-mono text-xs text-slate-200">{result.qrisString}</p>
+          </div>
+        </div>
       </div>
 
       <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -75,6 +126,37 @@ export function PaymentResult({ result }: { result: PaymentResultType | null }) 
           </a>
         </div>
       ) : null}
+
+      <div className="mt-5 rounded-xl border border-amber-500/25 bg-amber-500/5 p-4">
+        <p className="text-xs uppercase tracking-[0.25em] text-amber-300">Simulation bypass</p>
+        <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-center">
+          <select
+            value={selectedStatus}
+            onChange={(event) => setSelectedStatus(event.target.value as PaymentSimulationStatus)}
+            className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
+          >
+            <option value="PAID">Berhasil</option>
+            <option value="FAILED">Gagal</option>
+            <option value="CANCELLED">Dibatalkan user</option>
+            <option value="EXPIRED">Expired</option>
+          </select>
+
+          <button
+            type="button"
+            onClick={handleSimulateStatus}
+            disabled={simulating}
+            className="rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-2 text-sm font-medium text-amber-200 transition hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {simulating ? "Simulating..." : "Simulate status"}
+          </button>
+        </div>
+
+        {simulationState ? (
+          <p className={`mt-3 text-sm ${simulationState.success ? "text-emerald-300" : "text-rose-300"}`}>
+            {simulationState.message}
+          </p>
+        ) : null}
+      </div>
     </div>
   );
 }

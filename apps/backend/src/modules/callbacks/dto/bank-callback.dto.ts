@@ -4,8 +4,8 @@ export class BankCallbackDto {
   @IsString()
   transactionId!: string;
 
-  @IsIn(['PAID', 'FAILED', 'EXPIRED'])
-  status!: 'PAID' | 'FAILED' | 'EXPIRED';
+  @IsIn(['PAID', 'FAILED', 'EXPIRED', 'CANCELLED'])
+  status!: 'PAID' | 'FAILED' | 'EXPIRED' | 'CANCELLED';
 
   @IsOptional()
   @IsString()

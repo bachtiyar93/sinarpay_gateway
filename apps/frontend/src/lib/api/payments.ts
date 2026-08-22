@@ -1,4 +1,5 @@
 export type PaymentCurrency = "IDR" | "USD" | "SGD";
+export type PaymentSimulationStatus = "PAID" | "FAILED" | "EXPIRED" | "CANCELLED";
 
 export type CreatePaymentPayload = {
   amount: number;
@@ -18,7 +19,15 @@ export type PaymentResult = {
   description?: string;
 };
 
-const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
+export type PaymentSimulationResult = {
+  success: boolean;
+  transactionId: string;
+  status: PaymentSimulationStatus;
+  message?: string;
+};
+
+const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000").replace(/\/$/, "");
+const apiBaseUrl = `${baseUrl}/api`;
 
 function buildFallbackPayment(payload: CreatePaymentPayload): PaymentResult {
   const now = new Date();
@@ -47,7 +56,7 @@ export async function createPayment(payload: CreatePaymentPayload): Promise<Paym
   };
 
   try {
-    const response = await fetch(`${baseUrl}/v1/payments`, {
+    const response = await fetch(`${apiBaseUrl}/v1/payments`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -69,5 +78,47 @@ export async function createPayment(payload: CreatePaymentPayload): Promise<Paym
     };
   } catch {
     return buildFallbackPayment(payload);
+  }
+}
+
+export async function simulatePaymentStatus(
+  transactionId: string,
+  status: PaymentSimulationStatus,
+): Promise<PaymentSimulationResult> {
+  try {
+    const response = await fetch(`${apiBaseUrl}/test/bank-payment-confirm`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        transactionId,
+        status,
+        externalRef: `SIM-${status}-${Date.now()}`,
+      }),
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || `Simulation failed: ${response.status}`);
+    }
+
+    const data = (await response.json()) as PaymentSimulationResult;
+    return {
+      success: data.success,
+      transactionId: data.transactionId ?? transactionId,
+      status: data.status ?? status,
+      message: data.message ?? `Payment marked as ${status}.`,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unable to simulate payment status.";
+    return {
+      success: false,
+      transactionId,
+      status,
+      message,
+    };
   }
 }
