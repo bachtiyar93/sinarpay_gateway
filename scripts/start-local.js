@@ -56,6 +56,27 @@ function ensureEnvFiles() {
   }
 }
 
+function clearPortIfInUse(port) {
+  try {
+    if (process.platform === 'win32') {
+      const output = execSync(
+        `powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort ${port} -ErrorAction SilentlyContinue | ForEach-Object { $_.OwningProcess } | Sort-Object -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }"`,
+        { stdio: 'ignore' },
+      );
+      return output;
+    }
+
+    try {
+      execSync(`lsof -ti tcp:${port} | xargs -r kill -9`, { stdio: 'ignore' });
+      return;
+    } catch {
+      execSync(`fuser -k ${port}/tcp`, { stdio: 'ignore' });
+    }
+  } catch {
+    // ignore stale-process cleanup when the port is free or tooling is unavailable
+  }
+}
+
 async function ensureDependencies() {
   log('[1/5] Checking Node.js and npm...');
   if (!commandExists('node')) {
@@ -112,11 +133,19 @@ async function ensureDockerServices() {
   const waitForHealthy = async () => {
     for (let i = 0; i < 30; i += 1) {
       try {
-        const output = execSync(`${dockerCommand} compose ps --format json`, { cwd: repoRoot, encoding: 'utf8' });
-        const services = JSON.parse(output);
-        const healthy = Array.isArray(services)
-          ? services.filter((service) => ['postgres', 'redis'].includes(service.Service)).every((service) => service.State === 'running')
-          : true;
+        const output = execSync(`${dockerCommand} compose ps --format json`, {
+          cwd: repoRoot,
+          encoding: 'utf8',
+        });
+
+        const parsed = output
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .filter(Boolean)
+          .map((line) => JSON.parse(line));
+
+        const services = parsed.filter((service) => ['postgres', 'redis'].includes(service.Service));
+        const healthy = services.length === 2 && services.every((service) => service.State === 'running');
         if (healthy) {
           return;
         }
@@ -135,6 +164,10 @@ async function ensureDockerServices() {
 }
 
 async function startApp() {
+  log('[START] Membersihkan port yang masih dipakai oleh proses lama...');
+  clearPortIfInUse(3000);
+  clearPortIfInUse(3001);
+
   log('\n[START] Backend + frontend akan berjalan bersama...');
   log('Frontend: http://localhost:3001');
   log('Backend docs: http://localhost:3000/api/docs');
