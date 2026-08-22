@@ -3,17 +3,21 @@ import {
   UnauthorizedException,
   BadRequestException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../database/prisma.service';
 import { LoginDto } from './dto/login.dto';
 import { TokenResponse, AuthPayload } from './dto/auth-payload.interface';
 import * as bcrypt from 'bcrypt';
+import { EncryptionService } from '../../common/services/encryption.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
+    private configService: ConfigService,
+    private encryptionService: EncryptionService,
   ) {}
 
   async login(dto: LoginDto): Promise<TokenResponse> {
@@ -36,7 +40,7 @@ export class AuthService {
   async refreshToken(refreshToken: string): Promise<TokenResponse> {
     try {
       const payload = this.jwtService.verify<AuthPayload>(refreshToken, {
-        secret: process.env.JWT_REFRESH_SECRET || 'refresh-secret',
+        secret: this.configService.getOrThrow<string>('JWT_REFRESH_SECRET'),
       });
 
       const user = await this.prisma.user.findUnique({
@@ -98,7 +102,12 @@ export class AuthService {
     webhookUrl?: string,
   ) {
     return this.prisma.merchant.create({
-      data: { name, apiKeyHash, apiSecretHash, webhookUrl },
+      data: {
+        name,
+        apiKeyHash,
+        apiSecretHash: this.encryptionService.encrypt(apiSecretHash),
+        webhookUrl,
+      },
       select: { id: true, name: true, status: true },
     });
   }
@@ -112,18 +121,16 @@ export class AuthService {
       sub: userId,
       email,
       role,
-      iat: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + 3600, // 1 hour
     };
 
     const accessToken = await this.jwtService.signAsync(payload, {
-      secret: process.env.JWT_SECRET || 'secret',
+      secret: this.configService.getOrThrow<string>('JWT_SECRET'),
       expiresIn: 3600,
     });
 
     const refreshToken = await this.jwtService.signAsync(payload, {
-      secret: process.env.JWT_REFRESH_SECRET || 'refresh-secret',
-      expiresIn: 604800, // 7 days
+      secret: this.configService.getOrThrow<string>('JWT_REFRESH_SECRET'),
+      expiresIn: 604800,
     });
 
     return {

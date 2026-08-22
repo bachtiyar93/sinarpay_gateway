@@ -1,5 +1,6 @@
 import { Controller, Post, Body, UseGuards, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { TransactionService } from './transactions.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { CreatePaymentResponse } from './dto/create-payment-response.interface';
@@ -12,6 +13,7 @@ export interface MerchantRequest extends Request {
 
 @ApiTags('payments')
 @Controller('v1')
+@Throttle({ default: { limit: 1000, ttl: 60000 } })
 export class TransactionController {
   constructor(private transactionService: TransactionService) {}
 

@@ -4,6 +4,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { WebhookService } from './webhooks.service';
 import { WebhookCircuitBreakerService } from './webhooks-circuit-breaker.service';
 import { WebhookDlqService } from './webhooks-dlq.service';
+import { EncryptionService } from '../../common/services/encryption.service';
 
 describe('WebhookProcessorService', () => {
   let service: WebhookProcessorService;
@@ -46,6 +47,12 @@ describe('WebhookProcessorService', () => {
             fromDelivery: jest.fn(),
           },
         },
+        {
+          provide: EncryptionService,
+          useValue: {
+            decrypt: jest.fn(() => 'merchant-secret'),
+          },
+        },
       ],
     }).compile();
 
@@ -71,7 +78,7 @@ describe('WebhookProcessorService', () => {
       payload: { transactionId: 'txn-1' },
       merchant: {
         webhookUrl: 'https://merchant.test/webhook',
-        apiSecretHash: 'secret',
+        apiSecretHash: 'enc:secret',
       },
     });
     fetchSpy.mockImplementation(() =>
@@ -105,7 +112,7 @@ describe('WebhookProcessorService', () => {
       payload: { transactionId: 'txn-1' },
       merchant: {
         webhookUrl: 'https://merchant.test/webhook',
-        apiSecretHash: 'secret',
+        apiSecretHash: 'enc:secret',
       },
     });
     fetchSpy.mockImplementation(() =>

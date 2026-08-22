@@ -1,8 +1,11 @@
+/* eslint-disable @typescript-eslint/unbound-method */
 import { Test, TestingModule } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../../database/prisma.service';
+import { EncryptionService } from '../../common/services/encryption.service';
 import * as bcrypt from 'bcrypt';
 
 jest.mock('bcrypt');
@@ -32,6 +35,26 @@ describe('AuthService', () => {
       signAsync: jest.fn(),
       verify: jest.fn(),
     };
+    const configServiceMock = {
+      getOrThrow: jest.fn((key: string) => {
+        if (key === 'JWT_SECRET') {
+          return 'test-jwt-secret-test-jwt-secret';
+        }
+        if (key === 'JWT_REFRESH_SECRET') {
+          return 'test-refresh-secret-test-refresh-secret';
+        }
+        return 'test-value';
+      }),
+      get: jest.fn((key: string) => {
+        if (key === 'JWT_EXPIRES_IN') {
+          return '1h';
+        }
+        if (key === 'JWT_REFRESH_EXPIRES_IN') {
+          return '7d';
+        }
+        return undefined;
+      }),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -43,6 +66,17 @@ describe('AuthService', () => {
         {
           provide: JwtService,
           useValue: jwtServiceMock,
+        },
+        {
+          provide: ConfigService,
+          useValue: configServiceMock,
+        },
+        {
+          provide: EncryptionService,
+          useValue: {
+            encrypt: jest.fn((value: string) => `enc:${value}`),
+            decrypt: jest.fn((value: string) => value.replace(/^enc:/, '')),
+          },
         },
       ],
     }).compile();
@@ -160,5 +194,22 @@ describe('AuthService', () => {
         service.createUser(email, 'password123', 'Test'),
       ).rejects.toThrow(BadRequestException);
     });
+  });
+
+  it('encrypts merchant api secret on create', async () => {
+    (prisma.merchant.create as jest.Mock).mockResolvedValue({
+      id: 'm1',
+      name: 'Merchant',
+      status: 'ACTIVE',
+    });
+
+    await service.createMerchant('Merchant', 'key', 'plain-secret');
+
+    const createMock = prisma.merchant.create as jest.Mock;
+    expect(createMock.mock.calls).toHaveLength(1);
+    const firstCall = createMock.mock.calls[0] as [
+      { data: { apiSecretHash: string } },
+    ];
+    expect(firstCall[0].data.apiSecretHash).toBe('enc:plain-secret');
   });
 });

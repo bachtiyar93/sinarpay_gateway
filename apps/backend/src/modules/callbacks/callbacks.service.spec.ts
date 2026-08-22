@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 import { Test, TestingModule } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
 import { UnauthorizedException } from '@nestjs/common';
 import { CallbacksService } from './callbacks.service';
 import { PrismaService } from '../../database/prisma.service';
@@ -8,6 +9,7 @@ import { WebhookService } from '../webhooks/webhooks.service';
 import { HmacService } from '../../common/services/hmac.service';
 
 describe('CallbacksService', () => {
+  const bankSecret = 'test-bank-secret-test-bank-secret-test';
   let service: CallbacksService;
   let hmacService: HmacService;
   let prisma: PrismaService;
@@ -39,6 +41,12 @@ describe('CallbacksService', () => {
             sendWebhook: jest.fn(),
           },
         },
+        {
+          provide: ConfigService,
+          useValue: {
+            getOrThrow: jest.fn(() => bankSecret),
+          },
+        },
       ],
     }).compile();
 
@@ -55,11 +63,7 @@ describe('CallbacksService', () => {
       status: 'PAID' as const,
       externalRef: 'ref-1',
     };
-    const signature = hmacService.generateSignature(
-      payload,
-      process.env.BANK_CALLBACK_SECRET ||
-        'sinarpay_bank_simulator_secret_key_minimum_32_characters!',
-    );
+    const signature = hmacService.generateSignature(payload, bankSecret);
 
     expect(
       service.validateBankSignature({ ...payload, bankSignature: signature }),
@@ -83,11 +87,7 @@ describe('CallbacksService', () => {
       status: 'PAID' as const,
       externalRef: 'ref-1',
     };
-    const signature = hmacService.generateSignature(
-      payload,
-      process.env.BANK_CALLBACK_SECRET ||
-        'sinarpay_bank_simulator_secret_key_minimum_32_characters!',
-    );
+    const signature = hmacService.generateSignature(payload, bankSecret);
 
     (prisma.transaction.findUnique as jest.Mock).mockResolvedValue({
       id: 'txn-1',

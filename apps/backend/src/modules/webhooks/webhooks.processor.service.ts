@@ -10,6 +10,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { WebhookService } from './webhooks.service';
 import { WebhookCircuitBreakerService } from './webhooks-circuit-breaker.service';
 import { WebhookDlqService } from './webhooks-dlq.service';
+import { EncryptionService } from '../../common/services/encryption.service';
 
 @Injectable()
 export class WebhookProcessorService implements OnModuleInit, OnModuleDestroy {
@@ -21,6 +22,7 @@ export class WebhookProcessorService implements OnModuleInit, OnModuleDestroy {
     private webhookService: WebhookService,
     private breaker: WebhookCircuitBreakerService,
     private dlqService: WebhookDlqService,
+    private encryptionService: EncryptionService,
   ) {}
 
   onModuleInit(): void {
@@ -91,7 +93,7 @@ export class WebhookProcessorService implements OnModuleInit, OnModuleDestroy {
 
     const signature = this.webhookService.generateSignature(
       delivery.payload as Record<string, unknown>,
-      delivery.merchant.apiSecretHash,
+      this.encryptionService.decrypt(delivery.merchant.apiSecretHash),
     );
 
     const controller = new AbortController();

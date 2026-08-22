@@ -116,7 +116,7 @@ export class ReconciliationService {
     await this.performDailyReconciliation();
   }
 
-  getReport() {
+  getReport(): Promise<unknown[]> {
     return this.prisma.reconciliation.findMany({
       orderBy: { createdAt: 'desc' },
       take: 100,

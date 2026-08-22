@@ -3,6 +3,7 @@ import {
   UnauthorizedException,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../database/prisma.service';
 import { TransactionService } from '../transactions/transactions.service';
 import { WebhookService } from '../webhooks/webhooks.service';
@@ -10,10 +11,6 @@ import { HmacService } from '../../common/services/hmac.service';
 import { BankCallbackDto } from './dto/bank-callback.dto';
 import { SimulatePaymentDto } from './dto/simulate-payment.dto';
 import { TransactionStatus } from '../transactions/transaction-state-machine';
-
-const BANK_SECRET =
-  process.env.BANK_CALLBACK_SECRET ||
-  'sinarpay_bank_simulator_secret_key_minimum_32_characters!';
 
 function mapBankStatus(status: BankCallbackDto['status']): TransactionStatus {
   if (status === 'PAID') {
@@ -34,7 +31,12 @@ export class CallbacksService {
     private transactionService: TransactionService,
     private webhookService: WebhookService,
     private hmacService: HmacService,
+    private configService: ConfigService,
   ) {}
+
+  private bankSecret(): string {
+    return this.configService.getOrThrow<string>('BANK_CALLBACK_SECRET');
+  }
 
   validateBankSignature(dto: BankCallbackDto): boolean {
     const payload = {
@@ -45,7 +47,7 @@ export class CallbacksService {
 
     return this.hmacService.verifySignature(
       payload,
-      BANK_SECRET,
+      this.bankSecret(),
       dto.bankSignature,
     );
   }
@@ -107,7 +109,7 @@ export class CallbacksService {
 
     const bankSignature = this.hmacService.generateSignature(
       payload,
-      BANK_SECRET,
+      this.bankSecret(),
     );
 
     return this.handleBankNotification({

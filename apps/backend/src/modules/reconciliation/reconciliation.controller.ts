@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Param, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { ReconciliationService } from './reconciliation.service';
 import { WebhookDlqService } from '../webhooks/webhooks-dlq.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -9,6 +10,7 @@ import type { SettlementRow } from './settlement-simulator.service';
 
 @ApiTags('admin')
 @Controller()
+@Throttle({ default: { limit: 1000, ttl: 60000 } })
 export class ReconciliationController {
   constructor(
     private reconciliationService: ReconciliationService,

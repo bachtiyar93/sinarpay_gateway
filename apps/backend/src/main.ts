@@ -1,15 +1,39 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import type { NextFunction, Request, Response } from 'express';
 import { AppModule } from './app.module';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   // Enable CORS
   app.enableCors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3001',
+    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
     credentials: true,
+  });
+
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    res.setHeader('X-XSS-Protection', '0');
+    if (process.env.NODE_ENV === 'production') {
+      res.setHeader(
+        'Strict-Transport-Security',
+        'max-age=31536000; includeSubDomains',
+      );
+      if (req.headers['x-forwarded-proto'] !== 'https') {
+        res.status(400).json({
+          statusCode: 400,
+          message: 'HTTPS required',
+          timestamp: new Date().toISOString(),
+        });
+        return;
+      }
+    }
+    next();
   });
 
   // Global validation pipe
@@ -20,6 +44,8 @@ async function bootstrap() {
       transform: true,
     }),
   );
+
+  app.useGlobalFilters(new HttpExceptionFilter());
 
   // Set global API prefix
   app.setGlobalPrefix('api');
