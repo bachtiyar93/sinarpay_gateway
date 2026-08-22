@@ -5,6 +5,7 @@ import { AppService } from './app.service';
 import { PrismaModule } from './database/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { TransactionModule } from './modules/transactions/transactions.module';
+import { CallbacksModule } from './modules/callbacks/callbacks.module';
 import configuration from './config/configuration';
 import { validationSchema } from './config/validation.schema';
 
@@ -19,6 +20,7 @@ import { validationSchema } from './config/validation.schema';
     PrismaModule,
     AuthModule,
     TransactionModule,
+    CallbacksModule,
   ],
   controllers: [AppController],
   providers: [AppService],
