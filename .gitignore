@@ -5,6 +5,12 @@ build
 .env.local
 .DS_Store
 .idea
+
+# Internal AI workflow files (keep outside the repo)
+.planning/
+backend_AGENT.md
+frontend_AGENT.md
+
 *.swp
 *.swo
 *~
