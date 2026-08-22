@@ -6,9 +6,15 @@
     "apps/*"
   ],
   "scripts": {
-    "dev:frontend": "npm run dev --workspace=apps/frontend",
+    "start": "node ./scripts/start-local.js",
+    "stop": "node ./scripts/stop-local.js",
+    "dev:frontend": "npm run dev --workspace=apps/frontend -- --port 3001",
     "dev:backend": "npm run start:dev --workspace=apps/backend",
     "dev": "concurrently -n \"next,nest\" -c \"cyan,magenta\" \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "db:generate": "npm run db:generate --workspace=apps/backend",
+    "db:push": "npm run db:push --workspace=apps/backend",
+    "db:seed:admin": "node apps/backend/scripts/seed-admin.js",
+    "db:prepare": "npm run db:push && npm run db:seed:admin",
     "build:frontend": "npm run build --workspace=apps/frontend",
     "build:backend": "npm run build --workspace=apps/backend",
     "build": "npm run build:frontend && npm run build:backend"
