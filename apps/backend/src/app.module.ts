@@ -6,6 +6,9 @@ import { PrismaModule } from './database/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { TransactionModule } from './modules/transactions/transactions.module';
 import { CallbacksModule } from './modules/callbacks/callbacks.module';
+import { ReconciliationModule } from './modules/reconciliation/reconciliation.module';
+import { AuditModule } from './common/audit/audit.module';
+import { ScheduleModule } from '@nestjs/schedule';
 import configuration from './config/configuration';
 import { validationSchema } from './config/validation.schema';
 
@@ -17,10 +20,13 @@ import { validationSchema } from './config/validation.schema';
       validationSchema: validationSchema,
       envFilePath: '.env',
     }),
+    ScheduleModule.forRoot(),
     PrismaModule,
     AuthModule,
     TransactionModule,
     CallbacksModule,
+    AuditModule,
+    ReconciliationModule,
   ],
   controllers: [AppController],
   providers: [AppService],

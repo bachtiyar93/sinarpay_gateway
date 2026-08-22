@@ -33,4 +33,11 @@ export class WebhookService {
 
     return delivery;
   }
+
+  async getDeliveryById(deliveryId: string) {
+    return this.prisma.webhookDelivery.findUnique({
+      where: { id: deliveryId },
+      include: { merchant: true, transaction: true },
+    });
+  }
 }

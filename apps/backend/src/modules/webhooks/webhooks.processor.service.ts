@@ -8,6 +8,8 @@ import { Worker, Job } from 'bullmq';
 import type { RedisOptions } from 'ioredis';
 import { PrismaService } from '../../database/prisma.service';
 import { WebhookService } from './webhooks.service';
+import { WebhookCircuitBreakerService } from './webhooks-circuit-breaker.service';
+import { WebhookDlqService } from './webhooks-dlq.service';
 
 @Injectable()
 export class WebhookProcessorService implements OnModuleInit, OnModuleDestroy {
@@ -17,6 +19,8 @@ export class WebhookProcessorService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private prisma: PrismaService,
     private webhookService: WebhookService,
+    private breaker: WebhookCircuitBreakerService,
+    private dlqService: WebhookDlqService,
   ) {}
 
   onModuleInit(): void {
@@ -32,6 +36,13 @@ export class WebhookProcessorService implements OnModuleInit, OnModuleDestroy {
       this.logger.error(
         `Webhook job failed for delivery ${job?.data.deliveryId}: ${error.message}`,
       );
+
+      if (job && job.attemptsMade >= 5) {
+        void this.dlqService.fromDelivery(
+          job.data.deliveryId,
+          `Max retries exceeded: ${error.message}`,
+        );
+      }
     });
   }
 
@@ -61,7 +72,21 @@ export class WebhookProcessorService implements OnModuleInit, OnModuleDestroy {
           responseBody: 'Merchant webhook URL missing',
         },
       });
-      throw new Error('Merchant webhook URL missing');
+      await this.dlqService.fromDelivery(
+        delivery.id,
+        'Merchant webhook URL missing',
+      );
+      return;
+    }
+
+    if (!this.breaker.canAttempt(delivery.merchantId)) {
+      await this.prisma.webhookDelivery.update({
+        where: { id: delivery.id },
+        data: {
+          nextRetryAt: new Date(Date.now() + 30_000),
+        },
+      });
+      throw new Error(`Circuit open for merchant ${delivery.merchantId}`);
     }
 
     const signature = this.webhookService.generateSignature(
@@ -69,25 +94,73 @@ export class WebhookProcessorService implements OnModuleInit, OnModuleDestroy {
       delivery.merchant.apiSecretHash,
     );
 
-    const response = await fetch(delivery.merchant.webhookUrl, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-webhook-signature': signature,
-      },
-      body: JSON.stringify(delivery.payload),
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
+    let response: Response;
+
+    try {
+      response = await fetch(delivery.merchant.webhookUrl, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-webhook-signature': signature,
+        },
+        body: JSON.stringify(delivery.payload),
+        signal: controller.signal,
+      });
+    } catch (error) {
+      this.breaker.recordFailure(delivery.merchantId);
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
 
     const responseBody = await response.text();
 
+    if (response.ok) {
+      this.breaker.recordSuccess(delivery.merchantId);
+      await this.prisma.webhookDelivery.update({
+        where: { id: delivery.id },
+        data: {
+          attemptCount: { increment: 1 },
+          lastAttemptAt: new Date(),
+          status: 'DELIVERED',
+          responseCode: response.status,
+          responseBody,
+        },
+      });
+      return;
+    }
+
+    if (response.status >= 400 && response.status < 500) {
+      this.breaker.recordSuccess(delivery.merchantId);
+      await this.prisma.webhookDelivery.update({
+        where: { id: delivery.id },
+        data: {
+          attemptCount: { increment: 1 },
+          lastAttemptAt: new Date(),
+          status: 'FAILED',
+          responseCode: response.status,
+          responseBody,
+        },
+      });
+      await this.dlqService.fromDelivery(
+        delivery.id,
+        `Permanent webhook failure: ${response.status}`,
+      );
+      return;
+    }
+
+    this.breaker.recordFailure(delivery.merchantId);
     await this.prisma.webhookDelivery.update({
       where: { id: delivery.id },
       data: {
         attemptCount: { increment: 1 },
         lastAttemptAt: new Date(),
-        status: response.ok ? 'DELIVERED' : 'FAILED',
+        status: 'FAILED',
         responseCode: response.status,
         responseBody,
+        nextRetryAt: new Date(Date.now() + 5000),
       },
     });
 

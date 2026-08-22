@@ -34,6 +34,13 @@ enum WebhookDeliveryStatus {
   FAILED
 }
 
+enum ReconciliationStatus {
+  PENDING
+  MATCHED
+  MISMATCHED
+  RESOLVED
+}
+
 enum ActorType {
   MERCHANT
   OPS
@@ -85,6 +92,7 @@ model Transaction {
 
   history           TransactionHistory[]
   webhookDeliveries WebhookDelivery[]
+  reconciliations   Reconciliation[]
 
   @@index([merchantId])
   @@index([status])
@@ -142,4 +150,20 @@ model AuditLog {
   @@index([resourceType])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+model Reconciliation {
+  id           String               @id @default(uuid())
+  internalTxnId String              @unique
+  transaction  Transaction          @relation(fields: [internalTxnId], references: [id], onDelete: Cascade)
+  bankTxnId    String?
+  status       ReconciliationStatus @default(PENDING)
+  discrepancy  String?
+  resolvedAt   DateTime?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("reconciliations")
 }

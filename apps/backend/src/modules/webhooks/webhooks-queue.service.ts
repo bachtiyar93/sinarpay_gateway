@@ -13,6 +13,15 @@ export class WebhookQueueService implements OnModuleDestroy {
   constructor() {
     this.queue = new Queue('webhook-delivery', {
       connection: this.connection() as never,
+      defaultJobOptions: {
+        attempts: 5,
+        backoff: {
+          type: 'exponential',
+          delay: 5000,
+        },
+        removeOnComplete: true,
+        removeOnFail: false,
+      },
     });
   }
 
