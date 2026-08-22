@@ -10,18 +10,23 @@ import { WebhookService } from '../webhooks/webhooks.service';
 import { HmacService } from '../../common/services/hmac.service';
 import { BankCallbackDto } from './dto/bank-callback.dto';
 import { SimulatePaymentDto } from './dto/simulate-payment.dto';
-import { TransactionStatus } from '../transactions/transaction-state-machine';
+import {
+  normalizeTransactionStatus,
+  TransactionStatus,
+} from '../transactions/transaction-state-machine';
 
 function mapBankStatus(status: BankCallbackDto['status']): TransactionStatus {
-  if (status === 'PAID') {
-    return 'PAID';
+  const normalized = normalizeTransactionStatus(status);
+
+  if (normalized === 'SUCCESS') {
+    return 'SUCCESS';
   }
 
-  if (status === 'EXPIRED') {
-    return 'EXPIRED';
+  if (normalized === 'FAILED') {
+    return 'FAILED';
   }
 
-  return 'CANCELLED';
+  return normalized;
 }
 
 @Injectable()
@@ -113,16 +118,21 @@ export class CallbacksService {
     );
 
     try {
-      return await this.handleBankNotification({
+      const result = await this.handleBankNotification({
         ...dto,
         bankSignature,
       });
+
+      return {
+        ...result,
+        status: normalizeTransactionStatus(result.status),
+      };
     } catch (error) {
       if (error instanceof NotFoundException) {
         return {
           success: true,
           transactionId: dto.transactionId,
-          status: dto.status,
+          status: normalizeTransactionStatus(dto.status),
           message: `Dev simulation accepted for unknown transaction ${dto.transactionId}. No database record was found, but the requested status was applied in simulation mode.`,
         };
       }

@@ -50,13 +50,13 @@ export class ReconciliationService {
       const bankTxnId = settlement?.txnId ?? null;
       const internalStatus = transaction.status;
       const isMatch =
-        (internalStatus === 'PAID' && bankStatus === 'PAID') ||
-        (internalStatus !== 'PAID' && bankStatus === 'FAILED');
+        (internalStatus === 'SUCCESS' && bankStatus === 'SUCCESS') ||
+        (internalStatus !== 'SUCCESS' && bankStatus === 'FAILED');
 
-      if (!isMatch && bankStatus === 'PAID') {
+      if (!isMatch && bankStatus === 'SUCCESS') {
         await this.transactionService.transitionStatus(
           transaction.id,
-          'PAID',
+          'SUCCESS',
           'Reconciliation correction',
         );
 

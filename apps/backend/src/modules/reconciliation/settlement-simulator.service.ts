@@ -4,7 +4,7 @@ import { PrismaService } from '../../database/prisma.service';
 export interface SettlementRow {
   txnId: string;
   amount: number;
-  status: 'PAID' | 'FAILED';
+  status: 'SUCCESS' | 'FAILED';
   settledAt: string;
 }
 
@@ -30,9 +30,9 @@ export class SettlementSimulatorService {
           : Number(transaction.amount),
       status:
         index === 0
-          ? 'PAID'
-          : transaction.status === 'PAID'
-            ? 'PAID'
+          ? 'SUCCESS'
+          : transaction.status === 'SUCCESS'
+            ? 'SUCCESS'
             : 'FAILED',
       settledAt: new Date().toISOString(),
     }));

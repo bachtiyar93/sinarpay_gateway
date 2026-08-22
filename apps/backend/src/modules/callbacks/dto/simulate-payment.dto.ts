@@ -4,8 +4,8 @@ export class SimulatePaymentDto {
   @IsString()
   transactionId!: string;
 
-  @IsIn(['PAID', 'FAILED', 'EXPIRED', 'CANCELLED'])
-  status!: 'PAID' | 'FAILED' | 'EXPIRED' | 'CANCELLED';
+  @IsIn(['PAID', 'SUCCESS', 'FAILED', 'EXPIRED', 'CANCELLED'])
+  status!: 'PAID' | 'SUCCESS' | 'FAILED' | 'EXPIRED' | 'CANCELLED';
 
   @IsOptional()
   @IsString()

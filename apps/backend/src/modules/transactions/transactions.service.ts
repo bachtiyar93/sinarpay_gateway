@@ -4,6 +4,7 @@ import {
   NotFoundException,
   ForbiddenException,
 } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../../database/prisma.service';
 import { QrisSimulatorService } from './qris-simulator.service';
 import { IdempotencyService } from '../../common/services/idempotency.service';
@@ -11,6 +12,7 @@ import { CreatePaymentDto } from './dto/create-payment.dto';
 import { CreatePaymentResponse } from './dto/create-payment-response.interface';
 import {
   isValidTransition,
+  normalizeTransactionStatus,
   TransactionStatus,
 } from './transaction-state-machine';
 
@@ -62,10 +64,10 @@ export class TransactionService {
         merchantId,
         amount: dto.amount,
         currency: dto.currency,
-        status: 'ISSUED',
+        status: 'PENDING' as any,
         idempotencyKey: dto.idempotencyKey,
         expiredAt,
-        qrisPayload: '', // Will be set below
+        qrisPayload: '',
       },
     });
 
@@ -83,7 +85,7 @@ export class TransactionService {
       data: {
         transactionId: transaction.id,
         fromStatus: null,
-        toStatus: 'ISSUED',
+        toStatus: 'PENDING' as any,
         reason: 'Transaction created',
       },
     });
@@ -93,7 +95,7 @@ export class TransactionService {
       qrisString,
       amount: updated.amount.toNumber(),
       currency: updated.currency,
-      status: updated.status,
+      status: 'PENDING',
       expiresAt: expiredAt.toISOString(),
     };
 
@@ -103,11 +105,31 @@ export class TransactionService {
     return response;
   }
 
+  @Cron('*/30 * * * * *')
+  async expirePendingTransactions(): Promise<void> {
+    const expiredTransactions = await this.prisma.transaction.findMany({
+      where: {
+        status: 'PENDING' as any,
+        expiredAt: { lte: new Date() },
+      },
+      select: { id: true },
+    });
+
+    for (const transaction of expiredTransactions) {
+      await this.transitionStatus(
+        transaction.id,
+        'EXPIRED',
+        'Payment expired due to timeout',
+      );
+    }
+  }
+
   async transitionStatus(
     transactionId: string,
-    toStatus: TransactionStatus,
+    toStatus: TransactionStatus | string,
     reason?: string,
   ): Promise<void> {
+    const normalizedToStatus = normalizeTransactionStatus(toStatus) as any;
     const transaction = await this.prisma.transaction.findUnique({
       where: { id: transactionId },
     });
@@ -116,25 +138,24 @@ export class TransactionService {
       throw new NotFoundException('Transaction not found');
     }
 
-    // Validate transition
-    if (!isValidTransition(transaction.status, toStatus)) {
+    const currentStatus = normalizeTransactionStatus(transaction.status) as any;
+
+    if (!isValidTransition(currentStatus, normalizedToStatus)) {
       throw new BadRequestException(
-        `Cannot transition from ${transaction.status} to ${toStatus}`,
+        `Cannot transition from ${currentStatus} to ${normalizedToStatus}`,
       );
     }
 
-    // Update transaction status with type casting
     await this.prisma.transaction.update({
       where: { id: transactionId },
-      data: { status: toStatus },
+      data: { status: normalizedToStatus },
     });
 
-    // Record history with type casting
     await this.prisma.transactionHistory.create({
       data: {
         transactionId,
-        fromStatus: transaction.status,
-        toStatus,
+        fromStatus: currentStatus,
+        toStatus: normalizedToStatus,
         reason: reason || undefined,
       },
     });

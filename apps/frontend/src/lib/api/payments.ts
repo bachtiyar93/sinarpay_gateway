@@ -1,5 +1,5 @@
 export type PaymentCurrency = "IDR" | "USD" | "SGD";
-export type PaymentSimulationStatus = "PAID" | "FAILED" | "EXPIRED" | "CANCELLED";
+export type PaymentSimulationStatus = "SUCCESS" | "FAILED" | "EXPIRED" | "CANCELLED";
 
 export type CreatePaymentPayload = {
   amount: number;
@@ -42,7 +42,7 @@ function buildFallbackPayment(payload: CreatePaymentPayload): PaymentResult {
     qrisString,
     amount: Number(payload.amount),
     currency: chosenCurrency,
-    status: "ISSUED",
+    status: "PENDING",
     expiresAt,
     description: payload.description,
     paymentLink: `${window.location.origin}/pay/${transactionId}`,

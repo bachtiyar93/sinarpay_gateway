@@ -22,10 +22,11 @@ enum MerchantStatus {
 }
 
 enum TransactionStatus {
-  ISSUED
-  PAID
+  PENDING
+  SUCCESS
+  FAILED
   EXPIRED
-  CANCELLED
+  REFUNDED
 }
 
 enum WebhookDeliveryStatus {
@@ -82,7 +83,7 @@ model Transaction {
   merchant       Merchant          @relation(fields: [merchantId], references: [id], onDelete: Cascade)
   amount         Decimal           @db.Decimal(18, 2)
   currency       String            @default("IDR")
-  status         TransactionStatus @default(ISSUED)
+  status         TransactionStatus @default(PENDING)
   qrisPayload    String            @db.Text
   idempotencyKey String            @unique
   externalRef    String?           // Bank reference id

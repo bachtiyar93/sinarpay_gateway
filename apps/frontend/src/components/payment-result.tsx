@@ -7,7 +7,7 @@ import { simulatePaymentStatus, type PaymentResult as PaymentResultType, type Pa
 export function PaymentResult({ result }: { result: PaymentResultType | null }) {
   const [copied, setCopied] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
-  const [selectedStatus, setSelectedStatus] = useState<PaymentSimulationStatus>("PAID");
+  const [selectedStatus, setSelectedStatus] = useState<PaymentSimulationStatus>("SUCCESS");
   const [simulationState, setSimulationState] = useState<{ success: boolean; status: string; message: string } | null>(null);
   const [simulating, setSimulating] = useState(false);
 
@@ -135,7 +135,7 @@ export function PaymentResult({ result }: { result: PaymentResultType | null }) 
             onChange={(event) => setSelectedStatus(event.target.value as PaymentSimulationStatus)}
             className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
           >
-            <option value="PAID">Berhasil</option>
+            <option value="SUCCESS">Berhasil</option>
             <option value="FAILED">Gagal</option>
             <option value="CANCELLED">Dibatalkan user</option>
             <option value="EXPIRED">Expired</option>
