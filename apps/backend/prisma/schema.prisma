@@ -85,7 +85,7 @@ model Transaction {
   currency       String            @default("IDR")
   status         TransactionStatus @default(PENDING)
   qrisPayload    String            @db.Text
-  idempotencyKey String            @unique
+  idempotencyKey String
   externalRef    String?           // Bank reference id
   expiredAt      DateTime
   createdAt      DateTime          @default(now())
@@ -95,6 +95,7 @@ model Transaction {
   webhookDeliveries WebhookDelivery[]
   reconciliations   Reconciliation[]
 
+  @@unique([merchantId, idempotencyKey])
   @@index([merchantId])
   @@index([status])
   @@index([createdAt])

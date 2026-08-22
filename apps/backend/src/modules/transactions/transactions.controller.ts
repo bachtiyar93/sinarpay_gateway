@@ -31,7 +31,12 @@ export class TransactionController {
 
   @Post('payments')
   @UseGuards(ApiKeyGuard)
-  @ApiOperation({ summary: 'Create payment with QRIS' })
+  @ApiOperation({
+    summary: 'Create payment with QRIS',
+    description:
+      'Creates a QRIS payment transaction. Supports idempotent requests via idempotencyKey field. ' +
+      'Duplicate requests with same idempotencyKey return the existing transaction, preventing double-charging.',
+  })
   @ApiResponse({
     status: 201,
     description: 'Payment created successfully',
@@ -46,7 +51,7 @@ export class TransactionController {
       },
     },
   })
-  @ApiResponse({ status: 400, description: 'Invalid input' })
+  @ApiResponse({ status: 400, description: 'Invalid input or missing idempotencyKey' })
   @ApiResponse({ status: 401, description: 'Invalid API key' })
   async createPayment(
     @Body() dto: CreatePaymentDto,

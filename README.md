@@ -111,13 +111,31 @@ Note: frontend runs on port 3001, while backend API stays on port 3000.
 
 ## Merchant API endpoints
 
+### Idempotency
+
+All payment creation requests require an `idempotencyKey` field (UUID v4 format). This prevents double-charging if:
+- User clicks "Create Payment" button multiple times (spam)
+- Request times out and client retries
+- Network issue causes duplicate requests
+
+**How it works:**
+1. Client generates a UUID (e.g., via `crypto.randomUUID()`)
+2. Includes `idempotencyKey` in the payment creation request
+3. Backend stores the key + merchant relationship
+4. Duplicate requests with same key return the cached transaction response
+5. No new transaction is created on retry
+
+**Example:** Creating payment twice with same `idempotencyKey` returns 1 transaction.
+
+### Endpoints
+
 - `GET /api/v1/merchant/profile` - load merchant profile summary
 - `PUT /api/v1/merchant/profile` - update merchant profile name
 - `GET /api/v1/merchant/api-keys` - load active merchant API key list
 - `POST /api/v1/merchant/api-keys/:keyId/regenerate` - regenerate active merchant API key
 - `GET /api/v1/merchant/analytics` - load dashboard analytics summary
 - `GET /api/v1/merchant/analytics/trend?days=7` - load dashboard trend data
-- `POST /api/v1/payments` - create QRIS payment
+- `POST /api/v1/payments` - create QRIS payment (requires `idempotencyKey` in body)
 - `POST /api/v1/merchant/transactions/search` - list/search merchant transactions
 - `GET /api/v1/merchant/transactions/:transactionId` - transaction detail with real history
 - `POST /api/v1/merchant/transactions/:transactionId/refund` - refund a successful transaction

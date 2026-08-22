@@ -38,9 +38,9 @@ export class TransactionService {
       throw new BadRequestException(`Currency ${dto.currency} not supported`);
     }
 
-    // Check idempotency cache
+    // Check idempotency cache (fast path)
     const cached = await this.idempotency.get<CreatePaymentResponse>(
-      dto.idempotencyKey,
+      `${merchantId}:${dto.idempotencyKey}`,
     );
     if (cached) {
       return cached;
@@ -59,7 +59,32 @@ export class TransactionService {
       throw new ForbiddenException('Merchant is not active');
     }
 
-    // Create transaction
+    // Check if transaction already exists with same idempotency key
+    const existing = await this.prisma.transaction.findUnique({
+      where: {
+        merchantId_idempotencyKey: {
+          merchantId,
+          idempotencyKey: dto.idempotencyKey,
+        },
+      },
+    });
+
+    if (existing) {
+      // Return existing transaction response (idempotent)
+      const response: CreatePaymentResponse = {
+        transactionId: existing.id,
+        qrisString: existing.qrisPayload,
+        amount: existing.amount.toNumber(),
+        currency: existing.currency,
+        status: existing.status as any,
+        expiresAt: existing.expiredAt.toISOString(),
+      };
+      // Cache it for future requests
+      await this.idempotency.set(`${merchantId}:${dto.idempotencyKey}`, response);
+      return response;
+    }
+
+    // Create new transaction
     const expiredAt = new Date(Date.now() + PAYMENT_EXPIRY_MS);
 
     const transaction = await this.prisma.transaction.create({
@@ -103,7 +128,7 @@ export class TransactionService {
     };
 
     // Store in idempotency cache
-    await this.idempotency.set(dto.idempotencyKey, response);
+    await this.idempotency.set(`${merchantId}:${dto.idempotencyKey}`, response);
 
     return response;
   }

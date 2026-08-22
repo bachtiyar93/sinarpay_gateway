@@ -38,15 +38,28 @@ export function PaymentForm() {
       return;
     }
 
+    // Prevent multiple simultaneous requests by checking isSubmitting
+    if (isSubmitting) {
+      return;
+    }
+
     const sanitizedValues = parsed.data;
     setDraft({ amount: String(sanitizedValues.amount), description: sanitizedValues.description ?? "", currency: sanitizedValues.currency });
     setSubmitting(true);
 
     try {
+      // Generate or reuse idempotency key to prevent double-charging
+      let key = usePaymentGeneratorStore.getState().idempotencyKey;
+      if (!key) {
+        key = crypto.randomUUID();
+        usePaymentGeneratorStore.getState().setIdempotencyKey(key);
+      }
+
       const result = await createPayment({
         amount: sanitizedValues.amount,
         currency: sanitizedValues.currency,
         description: sanitizedValues.description || undefined,
+        idempotencyKey: key,
       });
       setResult(result);
       
