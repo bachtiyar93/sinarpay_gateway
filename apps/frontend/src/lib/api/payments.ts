@@ -28,6 +28,7 @@ export type PaymentSimulationResult = {
 
 const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000").replace(/\/$/, "");
 const apiBaseUrl = `${baseUrl}/api`;
+const merchantApiKey = process.env.NEXT_PUBLIC_MERCHANT_API_KEY ?? "merchant-demo-key";
 
 function buildFallbackPayment(payload: CreatePaymentPayload): PaymentResult {
   const now = new Date();
@@ -61,6 +62,7 @@ export async function createPayment(payload: CreatePaymentPayload): Promise<Paym
       headers: {
         "content-type": "application/json",
         Accept: "application/json",
+        "x-api-key": merchantApiKey,
       },
       body: JSON.stringify(requestBody),
       cache: "no-store",

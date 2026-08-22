@@ -21,6 +21,9 @@ ENCRYPTION_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 BANK_CALLBACK_SECRET=sinarpay_bank_simulator_secret_key_minimum_32_characters!
 WEBHOOK_MAX_RETRIES=5
 FRONTEND_URL=http://localhost:3001
+MERCHANT_NAME=Demo Merchant
+MERCHANT_API_KEY=merchant-demo-key
+MERCHANT_API_SECRET=merchant-demo-secret
 ```
 
 ## Frontend env
@@ -30,6 +33,7 @@ Create `apps/frontend/.env.local` from `.env.example` if it does not exist.
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:3000
 BACKEND_API_URL=http://localhost:3000
+NEXT_PUBLIC_MERCHANT_API_KEY=merchant-demo-key
 ```
 
 ## Notes

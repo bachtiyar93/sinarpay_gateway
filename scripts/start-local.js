@@ -54,6 +54,24 @@ function ensureEnvFiles() {
     fs.copyFileSync(frontendExample, frontendEnvPath);
     log('Created apps/frontend/.env.local from .env.example');
   }
+
+  if (fs.existsSync(frontendEnvPath)) {
+    const content = fs.readFileSync(frontendEnvPath, 'utf8');
+    if (!content.includes('NEXT_PUBLIC_MERCHANT_API_KEY=')) {
+      fs.appendFileSync(frontendEnvPath, '\nNEXT_PUBLIC_MERCHANT_API_KEY=merchant-demo-key\n');
+      log('Added merchant demo API key to apps/frontend/.env.local');
+    }
+  }
+
+  if (fs.existsSync(backendEnvPath)) {
+    const content = fs.readFileSync(backendEnvPath, 'utf8');
+    if (!content.includes('MERCHANT_API_KEY=')) {
+      fs.appendFileSync(backendEnvPath, '\nMERCHANT_API_KEY=merchant-demo-key\n');
+    }
+    if (!content.includes('MERCHANT_API_SECRET=')) {
+      fs.appendFileSync(backendEnvPath, 'MERCHANT_API_SECRET=merchant-demo-secret\n');
+    }
+  }
 }
 
 function clearPortIfInUse(port) {
