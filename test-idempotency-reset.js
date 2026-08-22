@@ -63,8 +63,12 @@ async function simulatePayment(transactionId, status) {
 async function test() {
   console.log('🧪 Testing Idempotency Key Reset After Payment Success\n');
 
-  const key1 = 'e5f6a7b8-5678-9012-def0-012345678901';
-  const key2 = 'f6a7b8c9-6789-0123-ef01-123456789012';
+  // Generate valid UUIDs
+  const { randomUUID } = require('crypto');
+  const key1 = randomUUID();
+  const key2 = randomUUID();
+
+  console.log(`Using keys:\n  Key1: ${key1}\n  Key2: ${key2}\n`);
 
   try {
     // Step 1: Create payment 1
