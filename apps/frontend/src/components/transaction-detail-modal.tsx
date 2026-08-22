@@ -28,6 +28,13 @@ export function TransactionDetailModal({ visible }: TransactionDetailModalProps)
       return;
     }
 
+    const confirmed = window.confirm(
+      "Refund dana untuk transaksi ini?",
+    );
+    if (!confirmed) {
+      return;
+    }
+
     setIsRefunding(true);
     setRefundError(null);
 
@@ -49,19 +56,31 @@ export function TransactionDetailModal({ visible }: TransactionDetailModalProps)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4">
-      <div className="w-full max-w-2xl rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
+      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-xs uppercase tracking-[0.25em] text-indigo-400">Transaction detail</p>
             <h3 className="mt-2 text-2xl font-semibold text-white">{selectedId}</h3>
           </div>
-          <button
-            type="button"
-            onClick={() => setSelectedId(null)}
-            className="rounded-md border border-slate-700 px-3 py-2 text-sm text-slate-300"
-          >
-            Close
-          </button>
+          <div className="flex items-center gap-2">
+            {detail?.status === "SUCCESS" ? (
+              <button
+                type="button"
+                onClick={handleRefund}
+                disabled={isRefunding}
+                className="rounded-md border border-sky-500/40 bg-sky-500/10 px-4 py-2 text-sm font-medium text-sky-200 transition hover:bg-sky-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isRefunding ? "Memproses refund..." : "Refund dana"}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => setSelectedId(null)}
+              className="rounded-md border border-slate-700 px-3 py-2 text-sm text-slate-300"
+            >
+              Close
+            </button>
+          </div>
         </div>
 
         {detailQuery.isLoading ? (
@@ -70,22 +89,10 @@ export function TransactionDetailModal({ visible }: TransactionDetailModalProps)
           <div className="mt-6 space-y-4 text-sm text-slate-300">
             {detail.status === "SUCCESS" ? (
               <div className="rounded-xl border border-sky-500/25 bg-sky-500/5 p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-medium text-sky-200">Refund dana</p>
-                    <p className="mt-1 text-xs text-slate-400">
-                      Refund hanya tersedia untuk transaksi dengan status SUCCESS.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleRefund}
-                    disabled={isRefunding}
-                    className="rounded-lg border border-sky-500/40 bg-sky-500/10 px-4 py-2 text-sm font-medium text-sky-200 transition hover:bg-sky-500/20 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {isRefunding ? "Memproses refund..." : "Refund dana"}
-                  </button>
-                </div>
+                <p className="text-sm font-medium text-sky-200">Refund tersedia</p>
+                <p className="mt-1 text-xs text-slate-400">
+                  Status SUCCESS akan tetap bertahan sampai user menekan tombol refund.
+                </p>
                 {refundError ? <p className="mt-3 text-sm text-rose-300">{refundError}</p> : null}
               </div>
             ) : null}
