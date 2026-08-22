@@ -123,6 +123,26 @@ export class TransactionController {
     return this.transactionService.getMerchantProfile(merchantId);
   }
 
+  @Put('merchant/profile')
+  @UseGuards(ApiKeyGuard)
+  @ApiOperation({ summary: 'Update merchant profile' })
+  @ApiResponse({ status: 200, description: 'Merchant profile updated successfully' })
+  @ApiResponse({ status: 400, description: 'Merchant name is required' })
+  @ApiResponse({ status: 401, description: 'Invalid API key' })
+  async updateMerchantProfile(
+    @Body() body: { name?: string },
+    @Req() req: MerchantRequest,
+  ) {
+    const merchantId = req.user?.merchantId;
+    if (!merchantId) {
+      throw new Error('Merchant ID not found in request');
+    }
+    if (!body?.name?.trim()) {
+      throw new BadRequestException('Merchant name is required');
+    }
+    return this.transactionService.updateMerchantProfile(merchantId, body.name);
+  }
+
   @Get('merchant/api-keys')
   @UseGuards(ApiKeyGuard)
   @ApiOperation({ summary: 'Get merchant API keys' })

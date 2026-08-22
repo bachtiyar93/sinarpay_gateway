@@ -27,7 +27,7 @@ export function MerchantShell({ merchantName, merchantId, role, children }: Merc
   const pathname = usePathname();
   const router = useRouter();
   const { sidebarOpen, toggleSidebar, setSidebarOpen } = useUiStore();
-  const { setSession, clearSession } = useSessionStore();
+  const { setSession, clearSession, merchantName: liveMerchantName } = useSessionStore();
 
   useEffect(() => {
     if (merchantName && role) {
@@ -43,6 +43,7 @@ export function MerchantShell({ merchantName, merchantId, role, children }: Merc
     () => navItems.find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`))?.label,
     [pathname],
   );
+  const displayMerchantName = liveMerchantName || merchantName;
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -62,7 +63,7 @@ export function MerchantShell({ merchantName, merchantId, role, children }: Merc
               <div>
                 <p className="text-xs uppercase tracking-[0.3em] text-indigo-400">SinarPay</p>
                 <h1 className="mt-2 text-lg font-semibold">Merchant Dashboard</h1>
-                <p className="mt-1 text-sm text-slate-400">{merchantName}</p>
+                <p className="mt-1 text-sm text-slate-400">{displayMerchantName}</p>
               </div>
               <button
                 type="button"
@@ -116,7 +117,7 @@ export function MerchantShell({ merchantName, merchantId, role, children }: Merc
               </div>
               <div className="flex items-center gap-3">
                 <div className="hidden text-right sm:block">
-                  <p className="text-sm font-medium text-white">{merchantName}</p>
+                  <p className="text-sm font-medium text-white">{displayMerchantName}</p>
                   <p className="text-xs text-slate-400">{role ?? "MERCHANT"}</p>
                 </div>
                 <button

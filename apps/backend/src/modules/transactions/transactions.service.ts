@@ -248,6 +248,34 @@ export class TransactionService {
     };
   }
 
+  async updateMerchantProfile(merchantId: string, name: string) {
+    const normalizedName = name.trim();
+    if (!normalizedName) {
+      throw new BadRequestException('Merchant name is required');
+    }
+
+    const merchant = await this.prisma.merchant.update({
+      where: { id: merchantId },
+      data: { name: normalizedName },
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        createdAt: true,
+        balance: true,
+      },
+    });
+
+    return {
+      id: merchant.id,
+      name: merchant.name,
+      email: null,
+      status: merchant.status,
+      createdAt: merchant.createdAt.toISOString(),
+      balance: merchant.balance.toNumber(),
+    };
+  }
+
   async getMerchantApiKeys(merchantId: string) {
     const merchant = await this.prisma.merchant.findUnique({
       where: { id: merchantId },

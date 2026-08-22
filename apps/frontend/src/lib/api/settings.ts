@@ -50,6 +50,24 @@ export async function getMerchantProfile(): Promise<MerchantProfile> {
   return (await response.json()) as MerchantProfile;
 }
 
+export async function updateMerchantProfile(name: string): Promise<MerchantProfile> {
+  const response = await fetch(`${apiBaseUrl}/v1/merchant/profile`, {
+    method: "PUT",
+    cache: "no-store",
+    headers: {
+      "content-type": "application/json",
+      Accept: "application/json",
+      "x-api-key": getMerchantApiKey(),
+    },
+    body: JSON.stringify({ name }),
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `Failed to update merchant profile: ${response.status}`);
+  }
+  return (await response.json()) as MerchantProfile;
+}
+
 export async function getApiKeys(): Promise<ApiKeyItem[]> {
   const response = await fetch(`${apiBaseUrl}/v1/merchant/api-keys`, {
     cache: "no-store",

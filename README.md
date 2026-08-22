@@ -112,6 +112,7 @@ Note: frontend runs on port 3001, while backend API stays on port 3000.
 ## Merchant API endpoints
 
 - `GET /api/v1/merchant/profile` - load merchant profile summary
+- `PUT /api/v1/merchant/profile` - update merchant profile name
 - `GET /api/v1/merchant/api-keys` - load active merchant API key list
 - `POST /api/v1/merchant/api-keys/:keyId/regenerate` - regenerate active merchant API key
 - `GET /api/v1/merchant/analytics` - load dashboard analytics summary
